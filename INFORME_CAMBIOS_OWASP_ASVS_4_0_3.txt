@@ -1,0 +1,228 @@
+INFORME DE CAMBIOS DE SEGURIDAD
+OWASP ASVS 4.0.3
+
+Proyecto: icontrol-seguimiento-lineas-main
+Alcance: proyecto raiz exclusivamente
+Fecha: 2026-09-08
+
+1. OBJETIVO
+-----------
+Se aplicaron controles basicos de seguridad alineados con OWASP ASVS 4.0.3,
+conservando la arquitectura Laravel existente, Sanctum, FormRequests, servicios
+actuales y las pruebas Feature.
+
+No se crearon diez controladores independientes. Los controles se implementaron
+en los controladores, rutas, requests y pruebas que ya forman parte de la
+arquitectura del proyecto.
+
+2. CAMBIOS REALIZADOS
+---------------------
+
+2.1 Autenticacion y proteccion contra fuerza bruta
+
+Archivo:
+app/Http/Controllers/Api/AuthController.php
+
+Cambios:
+- El metodo login() ahora recibe LoginRequest.
+- Se utiliza LoginRequest::authenticate() para reutilizar la autenticacion y el
+  RateLimiter existente.
+- Se utiliza solamente la informacion validada mediante validated().
+- Se conserva la emision de tokens Sanctum y la respuesta JSON existente.
+
+Archivo:
+app/Http/Requests/Auth/LoginRequest.php
+
+Cambios:
+- Se agrego la validacion opcional de device_name con maximo de 255 caracteres.
+- Se conserva el limite de cinco intentos por clave email/IP.
+
+Archivo:
+routes/api.php
+
+Cambios:
+- El endpoint POST /api/login ahora tiene middleware throttle:5,1.
+
+Control relacionado:
+- OWASP ASVS V2.2.1: proteccion contra ataques de fuerza bruta.
+- OWASP ASVS V2.1.1 y V2.1.2: validacion del proceso de autenticacion.
+
+2.2 Validacion de entrada y prevencion de mass assignment
+
+Archivos modificados:
+app/Http/Controllers/Api/InternoController.php
+app/Http/Controllers/Api/MicroController.php
+app/Http/Controllers/Api/ParadaController.php
+app/Http/Controllers/Api/PropietarioController.php
+app/Http/Controllers/Api/RutaController.php
+app/Http/Controllers/Api/TurnoController.php
+
+Cambios:
+- Los metodos store() y update() dejaron de utilizar request->all().
+- Cada controlador utiliza el FormRequest correspondiente.
+- Se utiliza validated() antes de crear o actualizar modelos.
+- Se evita aceptar campos no definidos por las reglas de validacion.
+
+FormRequests utilizados:
+app/Http/Requests/InternoRequest.php
+app/Http/Requests/MicroRequest.php
+app/Http/Requests/PropietarioRequest.php
+app/Http/Requests/RutaRequest.php
+app/Http/Requests/TurnoRequest.php
+
+Correccion adicional:
+- PropietarioController dejo de importar el modelo inexistente App\Models\Dueno.
+- Ahora utiliza App\Models\Propietario, que es el modelo existente.
+
+Controles relacionados:
+- OWASP ASVS V5.1.1: validacion completa en servidor.
+- OWASP ASVS V5.3.4: prevencion de asignacion masiva.
+
+2.3 Autorizacion por objeto en asignaciones y GPS
+
+Archivo:
+app/Http/Controllers/Api/AsignacionTurnoApi.php
+
+Cambios:
+- Las acciones iniciar() y finalizar() verifican que el conductor autenticado
+  sea el conductor asignado al turno.
+- Un conductor que intenta operar una asignacion ajena recibe HTTP 403.
+- Se conserva la validacion de transiciones de estado en
+  AsignacionTurnoService.
+
+Archivo:
+app/Http/Controllers/Api/SeguimientoGpsApiController.php
+
+Cambios:
+- Se centralizo la comprobacion en usuarioPuedeAcceder().
+- guardarUbicacion() verifica la pertenencia de la asignacion.
+- sincronizarLote() verifica la pertenencia de la asignacion.
+- estadoRecorrido() verifica la pertenencia antes de devolver posiciones,
+  paradas y datos del recorrido.
+- Los accesos no autorizados devuelven HTTP 403.
+
+Controles relacionados:
+- OWASP ASVS V4.1.1: minimo privilegio.
+- OWASP ASVS V4.2.1: autorizacion a nivel de objeto y prevencion de BOLA.
+- OWASP ASVS V13.1.1 y V13.2.1: seguridad de APIs.
+
+2.4 Validacion de datos GPS
+
+Archivos:
+app/Http/Requests/Api/StoreUbicacionGpsRequest.php
+app/Http/Requests/Api/SincronizarUbicacionesGpsRequest.php
+
+Cambios:
+- Se mantiene la validacion de latitud entre -90 y 90.
+- Se mantiene la validacion de longitud entre -180 y 180.
+- Se mantiene la validacion de velocidad no negativa.
+- El lote de sincronizacion esta limitado a 300 ubicaciones.
+- fecha_hora_gps no puede superar ahora mas dos minutos.
+- La validacion de fechas utiliza Carbon y evita errores internos para payloads
+  invalidos.
+
+Archivo:
+routes/api.php
+
+Controles existentes conservados:
+- Los endpoints GPS utilizan throttle:120,1.
+
+Controles relacionados:
+- OWASP ASVS V5.1.1: validacion de entradas.
+- OWASP ASVS V13.2.1: limites y controles de API.
+
+3. PRUEBAS AGREGADAS O ACTUALIZADAS
+-----------------------------------
+
+Archivo:
+tests/Feature/Api/SanctumAuthenticationTest.php
+
+Pruebas:
+- Login API correcto.
+- Acceso a endpoint protegido con token.
+- Revocacion del token al cerrar sesion.
+- Rate limiting del login: el sexto intento recibe HTTP 429.
+
+Archivo:
+tests/Feature/Api/AsignacionTurnoDriverApiTest.php
+
+Pruebas:
+- Un conductor puede iniciar y finalizar su propia asignacion.
+- Un conductor no puede iniciar la asignacion de otro conductor.
+- El acceso ajeno recibe HTTP 403.
+
+Archivo:
+tests/Feature/Api/SeguimientoGpsApiTest.php
+
+Pruebas:
+- Registro de una ubicacion GPS.
+- Deduplicacion de puntos GPS repetidos.
+- Finalizacion automatica al llegar a la ultima parada.
+- Sincronizacion de lote offline.
+- Rechazo de GPS para una asignacion ajena con HTTP 403.
+- Rechazo de fecha GPS futura con HTTP 422.
+- Rechazo de consulta de recorrido ajeno con HTTP 403.
+
+4. VALIDACION EJECUTADA
+-----------------------
+
+Comando:
+php artisan test tests/Feature/Api
+
+Resultado:
+- 16 pruebas aprobadas.
+- 59 aserciones aprobadas.
+
+Comando:
+vendor\bin\pint --test [archivos modificados]
+
+Resultado:
+- Pint aprobado.
+
+Suite completa:
+php artisan test
+
+Resultado:
+- 40 pruebas aprobadas.
+- 2 pruebas fallidas por un problema preexistente de Swagger.
+
+Fallo pendiente:
+- El comando l5-swagger:generate no existe en el entorno actual.
+- Las pruebas afectadas son:
+  tests/Feature/SwaggerDocumentationTest.php
+- Este fallo no esta relacionado con los cambios de seguridad implementados.
+
+5. CONTROLES ASVS CUBIERTOS EN ESTA ENTREGA
+--------------------------------------------
+
+- V2.1.1 / V2.1.2: autenticacion y validacion de credenciales.
+- V2.2.1: proteccion contra fuerza bruta.
+- V4.1.1: minimo privilegio en operaciones del conductor.
+- V4.2.1: autorizacion por objeto y prevencion de BOLA.
+- V5.1.1: validacion de entrada del lado servidor.
+- V5.3.4: prevencion de asignacion masiva.
+- V13.1.1 / V13.2.1: controles de seguridad para APIs y limites de consumo.
+
+6. PENDIENTES
+-------------
+
+- Implementar Policies centralizadas para el resto de recursos API.
+- Aplicar permisos Spatie a todos los CRUD API y a las rutas web de roles y
+  usuarios.
+- Crear API Resources para reducir la exposicion de PII y coordenadas GPS.
+- Uniformar respuestas globales de error 401, 403, 404, 422 y 429.
+- Resolver la instalacion/configuracion de l5-swagger para recuperar las dos
+  pruebas fallidas.
+- Revisar credenciales de seeders antes de cualquier despliegue.
+- En produccion utilizar APP_DEBUG=false, HTTPS y CORS restringido.
+- La credencial SMTP que fue expuesta en el archivo .env debe ser revocada y
+  regenerada directamente en el proveedor de correo.
+
+7. CAMBIOS FUERA DEL ALCANCE
+----------------------------
+
+- La carpeta linea57_control no forma parte de esta implementacion.
+- No se realizaron cambios de arquitectura ni migracion de framework.
+- No se modifico deliberadamente el archivo eliminado
+  SDD_actualizado_linea_control_v2_revisado.txt, ya que ese cambio aparecia
+  como preexistente y no corresponde a esta entrega.

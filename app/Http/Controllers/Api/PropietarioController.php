@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Dueño;
-use Illuminate\Http\Request;
+use App\Http\Requests\PropietarioRequest;
+use App\Models\Propietario;
 
 class PropietarioController extends Controller
 {
@@ -13,9 +13,9 @@ class PropietarioController extends Controller
         return response()->json(Dueño::all());
     }
 
-    public function store(Request $request)
+    public function store(PropietarioRequest $request)
     {
-        $propietario = Dueño::create($request->all());
+        $propietario = Propietario::create($request->validated());
 
         return response()->json($propietario, 201);
     }
@@ -25,17 +25,17 @@ class PropietarioController extends Controller
         return response()->json(Dueño::findOrFail($id));
     }
 
-    public function update(Request $request, string $id)
+    public function update(PropietarioRequest $request, string $id)
     {
-        $propietario = Dueño::findOrFail($id);
-        $propietario->update($request->all());
+        $propietario = Propietario::findOrFail($id);
+        $propietario->update($request->validated());
 
         return response()->json($propietario);
     }
 
     public function destroy(string $id)
     {
-        Dueño::destroy($id);
+        Propietario::destroy($id);
 
         return response()->json(['message' => 'Propietario eliminado']);
     }

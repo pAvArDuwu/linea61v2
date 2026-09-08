@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ParadaRequest;
 use App\Models\Parada;
-use Illuminate\Http\Request;
 
 class ParadaController extends Controller
 {
@@ -13,9 +13,9 @@ class ParadaController extends Controller
         return response()->json(Parada::all());
     }
 
-    public function store(Request $request)
+    public function store(ParadaRequest $request)
     {
-        $parada = Parada::create($request->all());
+        $parada = Parada::create($request->validated());
 
         return response()->json($parada, 201);
     }
@@ -25,10 +25,10 @@ class ParadaController extends Controller
         return response()->json(Parada::findOrFail($id));
     }
 
-    public function update(Request $request, string $id)
+    public function update(ParadaRequest $request, string $id)
     {
         $parada = Parada::findOrFail($id);
-        $parada->update($request->all());
+        $parada->update($request->validated());
 
         return response()->json($parada);
     }

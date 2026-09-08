@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\RutaRequest;
 use App\Models\Ruta;
-use Illuminate\Http\Request;
 
 class RutaController extends Controller
 {
@@ -13,9 +13,9 @@ class RutaController extends Controller
         return response()->json(Ruta::all());
     }
 
-    public function store(Request $request)
+    public function store(RutaRequest $request)
     {
-        $ruta = Ruta::create($request->all());
+        $ruta = Ruta::create($request->validated());
 
         return response()->json($ruta, 201);
     }
@@ -25,10 +25,10 @@ class RutaController extends Controller
         return response()->json(Ruta::findOrFail($id));
     }
 
-    public function update(Request $request, string $id)
+    public function update(RutaRequest $request, string $id)
     {
         $ruta = Ruta::findOrFail($id);
-        $ruta->update($request->all());
+        $ruta->update($request->validated());
 
         return response()->json($ruta);
     }

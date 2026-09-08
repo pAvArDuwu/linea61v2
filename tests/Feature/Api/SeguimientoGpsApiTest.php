@@ -4,7 +4,6 @@ namespace Tests\Feature\Api;
 
 use App\Models\AsignacionTurno;
 use App\Models\Conductor;
-use App\Models\ControlRecorrido;
 use App\Models\Interno;
 use App\Models\Micro;
 use App\Models\Parada;
@@ -22,11 +21,17 @@ class SeguimientoGpsApiTest extends TestCase
     use RefreshDatabase;
 
     protected User $user;
+
     protected Conductor $conductor;
+
     protected AsignacionTurno $asignacion;
+
     protected Ruta $ruta;
+
     protected Parada $parada1;
+
     protected Parada $parada2;
+
     protected string $token;
 
     protected function setUp(): void
@@ -223,5 +228,57 @@ class SeguimientoGpsApiTest extends TestCase
             ->assertJsonPath('resultado.guardados', 2);
 
         $this->assertSame(2, SeguimientoGps::where('asignacion_turno_id', $this->asignacion->id)->count());
+    }
+
+    public function test_conductor_cannot_report_gps_for_another_assignment(): void
+    {
+        $otroUser = User::factory()->create();
+        $otroConductor = Conductor::create([
+            'user_id' => $otroUser->id,
+            'licencia' => 'LIC-GPS-100',
+            'estado' => 'activo',
+        ]);
+
+        $asignacionAjena = $this->asignacion->replicate();
+        $asignacionAjena->conductor_id = $otroConductor->id;
+        $asignacionAjena->save();
+
+        $this->withToken($this->token)
+            ->postJson("/api/mis/asignaciones/{$asignacionAjena->id}/ubicaciones", [
+                'fecha_hora_gps' => now()->subMinute()->toDateTimeString(),
+                'latitud' => -17.78301000,
+                'longitud' => -63.18201000,
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_future_gps_timestamp_is_rejected(): void
+    {
+        $this->withToken($this->token)
+            ->postJson("/api/mis/asignaciones/{$this->asignacion->id}/ubicaciones", [
+                'fecha_hora_gps' => now()->addMinutes(3)->toDateTimeString(),
+                'latitud' => -17.78301000,
+                'longitud' => -63.18201000,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['fecha_hora_gps']);
+    }
+
+    public function test_conductor_cannot_view_another_assignment_route(): void
+    {
+        $otroUser = User::factory()->create();
+        $otroConductor = Conductor::create([
+            'user_id' => $otroUser->id,
+            'licencia' => 'LIC-GPS-101',
+            'estado' => 'activo',
+        ]);
+
+        $asignacionAjena = $this->asignacion->replicate();
+        $asignacionAjena->conductor_id = $otroConductor->id;
+        $asignacionAjena->save();
+
+        $this->withToken($this->token)
+            ->getJson("/api/mis/asignaciones/{$asignacionAjena->id}/recorrido")
+            ->assertForbidden();
     }
 }

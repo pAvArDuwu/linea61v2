@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\TurnoRequest;
 use App\Models\Turno;
-use Illuminate\Http\Request;
 
 class TurnoController extends Controller
 {
@@ -13,9 +13,9 @@ class TurnoController extends Controller
         return response()->json(Turno::all());
     }
 
-    public function store(Request $request)
+    public function store(TurnoRequest $request)
     {
-        $turno = Turno::create($request->all());
+        $turno = Turno::create($request->validated());
 
         return response()->json($turno, 201);
     }
@@ -25,10 +25,10 @@ class TurnoController extends Controller
         return response()->json(Turno::findOrFail($id));
     }
 
-    public function update(Request $request, string $id)
+    public function update(TurnoRequest $request, string $id)
     {
         $turno = Turno::findOrFail($id);
-        $turno->update($request->all());
+        $turno->update($request->validated());
 
         return response()->json($turno);
     }

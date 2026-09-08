@@ -12,7 +12,7 @@ use App\Http\Controllers\Api\TurnoController;
 use App\Http\Controllers\Api\AsignacionTurnoApi;
 
 // Rutas públicas
-Route::post('/login',    [AuthController::class, 'login']);
+Route::post('/login',    [AuthController::class, 'login'])->middleware('throttle:5,1');
 
 // Rutas protegidas
 Route::middleware('auth:sanctum')->group(function () {

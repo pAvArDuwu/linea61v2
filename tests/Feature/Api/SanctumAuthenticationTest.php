@@ -34,4 +34,21 @@ class SanctumAuthenticationTest extends TestCase
 
         $this->assertDatabaseCount('personal_access_tokens', 0);
     }
+
+    public function test_api_login_is_rate_limited(): void
+    {
+        $user = User::factory()->create(['password' => 'password']);
+
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $this->postJson('/api/login', [
+                'email' => $user->email,
+                'password' => 'incorrect-password',
+            ])->assertUnprocessable();
+        }
+
+        $this->postJson('/api/login', [
+            'email' => $user->email,
+            'password' => 'incorrect-password',
+        ])->assertTooManyRequests();
+    }
 }

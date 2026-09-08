@@ -18,10 +18,15 @@ class AsignacionTurnoDriverApiTest extends TestCase
     use RefreshDatabase;
 
     protected User $userConductor;
+
     protected Conductor $conductor;
+
     protected Turno $turno;
+
     protected Ruta $ruta;
+
     protected Micro $micro;
+
     protected string $token;
 
     protected function setUp(): void
@@ -184,7 +189,6 @@ class AsignacionTurnoDriverApiTest extends TestCase
         // Intentar iniciar con el token de Carlos Gomez
         $this->withToken($this->token)
             ->postJson("/api/mis/asignaciones/{$asignacionAjena->id}/iniciar")
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['conductor']);
+            ->assertForbidden();
     }
 }

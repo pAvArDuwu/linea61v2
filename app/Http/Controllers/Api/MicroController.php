@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\MicroRequest;
 use App\Models\Micro;
-use Illuminate\Http\Request;
 
 class MicroController extends Controller
 {
@@ -13,9 +13,9 @@ class MicroController extends Controller
         return response()->json(Micro::all());
     }
 
-    public function store(Request $request)
+    public function store(MicroRequest $request)
     {
-        $micro = Micro::create($request->all());
+        $micro = Micro::create($request->validated());
 
         return response()->json($micro, 201);
     }
@@ -25,10 +25,10 @@ class MicroController extends Controller
         return response()->json(Micro::findOrFail($id));
     }
 
-    public function update(Request $request, string $id)
+    public function update(MicroRequest $request, string $id)
     {
         $micro = Micro::findOrFail($id);
-        $micro->update($request->all());
+        $micro->update($request->validated());
 
         return response()->json($micro);
     }

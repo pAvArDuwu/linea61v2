@@ -1,0 +1,218 @@
+INFORME DE LINEAS DE CODIGO MODIFICADAS
+OWASP ASVS 4.0.3
+
+Proyecto: icontrol-seguimiento-lineas-main
+Fecha: 2026-09-08
+
+NOTA SOBRE LAS REFERENCIAS
+--------------------------
+Las referencias indican archivo y numero de linea segun el estado actual del
+proyecto al momento de generar este informe. Si se vuelve a formatear un
+archivo, los numeros pueden desplazarse.
+
+1. AUTENTICACION Y RATE LIMITING
+--------------------------------
+
+Archivo: app/Http/Controllers/Api/AuthController.php
+
+- Linea 6: importacion de LoginRequest.
+- Linea 12: login() recibe LoginRequest en lugar de Request generico.
+- Linea 14: ejecucion de $request->authenticate().
+- Linea 15: lectura exclusiva de datos validados.
+- Linea 18: creacion del token Sanctum.
+- Linea 32: metodo logout() para revocar el token actual.
+
+Archivo: app/Http/Requests/Auth/LoginRequest.php
+
+- Linea 33: validacion de device_name con limite de 255 caracteres.
+- Linea 42: metodo authenticate().
+- Lineas 60-75: control de intentos y bloqueo mediante RateLimiter.
+- Lineas 80-83: clave de limitacion usando email e IP.
+
+Archivo: routes/api.php
+
+- Linea 15: POST /api/login protegido con throttle:5,1.
+
+Control ASVS relacionado:
+- V2.1.1 / V2.1.2: autenticacion.
+- V2.2.1: proteccion contra fuerza bruta.
+
+2. AUTORIZACION DE ASIGNACIONES
+-------------------------------
+
+Archivo: app/Http/Controllers/Api/AsignacionTurnoApi.php
+
+- Linea 177: inicio de la accion iniciar().
+- Linea 179: busqueda de la asignacion solicitada.
+- Linea 183: respuesta HTTP 403 para una asignacion no autorizada.
+- Linea 199: inicio de la accion finalizar().
+- Linea 201: busqueda de la asignacion solicitada.
+- Linea 205: respuesta HTTP 403 para una asignacion no autorizada.
+
+Control ASVS relacionado:
+- V4.1.1: minimo privilegio.
+- V4.2.1: autorizacion a nivel de objeto y prevencion de BOLA.
+
+3. AUTORIZACION Y PROTECCION GPS
+--------------------------------
+
+Archivo: app/Http/Controllers/Api/SeguimientoGpsApiController.php
+
+- Linea 22: guardarUbicacion() recibe el request validado y el ID de asignacion.
+- Linea 24: busqueda controlada de la asignacion.
+- Linea 26: comprobacion de pertenencia del usuario a la asignacion.
+- Linea 29: respuesta HTTP 403 si el usuario no puede reportar GPS.
+- Linea 32: uso de datos validados para registrar el punto.
+- Linea 43: sincronizarLote() para ubicaciones offline.
+- Linea 45: busqueda de la asignacion del lote.
+- Linea 47: comprobacion de pertenencia en sincronizacion.
+- Linea 50: respuesta HTTP 403 para sincronizacion no autorizada.
+- Linea 53: envio del lote al servicio con los datos recibidos.
+- Linea 64: estadoRecorrido() para consultar el recorrido.
+- Linea 66: busqueda de la asignacion consultada.
+- Linea 68: comprobacion de pertenencia antes de devolver datos.
+- Linea 71: respuesta HTTP 403 para recorrido ajeno.
+- Linea 74: carga de relaciones del recorrido y ultima posicion.
+- Linea 89: metodo privado usuarioPuedeAcceder().
+- Linea 93: comparacion del conductor autenticado con el conductor asignado.
+
+Controles ASVS relacionados:
+- V4.2.1: control de acceso a nivel de objeto.
+- V8.3.1: proteccion de datos sensibles y localizacion.
+- V13.1.1 / V13.2.1: seguridad de API.
+
+4. VALIDACION DE GPS
+--------------------
+
+Archivo: app/Http/Requests/Api/StoreUbicacionGpsRequest.php
+
+- Linea 5: importacion de Carbon.
+- Lineas 18-30: validacion de fecha_hora_gps.
+- Linea 23: conversion segura de la fecha recibida.
+- Linea 28: rechazo de fechas posteriores a ahora mas dos minutos.
+- Lineas 32-34: limites de latitud, longitud y velocidad.
+
+Archivo: app/Http/Requests/Api/SincronizarUbicacionesGpsRequest.php
+
+- Linea 5: importacion de Carbon.
+- Linea 19: limite del lote entre 1 y 300 ubicaciones.
+- Lineas 20-32: validacion de fecha GPS para cada ubicacion.
+- Linea 25: conversion segura de la fecha recibida.
+- Linea 30: rechazo de fechas futuras fuera del margen permitido.
+- Lineas 35-37: limites de latitud, longitud y velocidad por ubicacion.
+
+Archivo: routes/api.php
+
+- Lineas 35-39: endpoints GPS agrupados bajo throttle:120,1.
+
+Controles ASVS relacionados:
+- V5.1.1: validacion completa del lado servidor.
+- V13.2.1: limites de consumo de API.
+
+5. PREVENCION DE MASS ASSIGNMENT EN CRUD API
+---------------------------------------------
+
+Archivo: app/Http/Controllers/Api/InternoController.php
+
+- Linea 6: uso de InternoRequest.
+- Linea 16: store() recibe InternoRequest.
+- Linea 18: creacion con request->validated().
+- Linea 28: update() recibe InternoRequest.
+- Linea 31: actualizacion con request->validated().
+
+Archivo: app/Http/Controllers/Api/MicroController.php
+
+- Linea 6: uso de MicroRequest.
+- Linea 16: store() recibe MicroRequest.
+- Linea 18: creacion con request->validated().
+- Linea 28: update() recibe MicroRequest.
+- Linea 31: actualizacion con request->validated().
+
+Archivo: app/Http/Controllers/Api/ParadaController.php
+
+- Linea 6: uso de ParadaRequest.
+- Linea 16: store() recibe ParadaRequest.
+- Linea 18: creacion con request->validated().
+- Linea 28: update() recibe ParadaRequest.
+- Linea 31: actualizacion con request->validated().
+
+Archivo: app/Http/Controllers/Api/PropietarioController.php
+
+- Linea 6: uso de PropietarioRequest.
+- Linea 7: uso del modelo existente Propietario.
+- Linea 16: store() recibe PropietarioRequest.
+- Linea 18: creacion con request->validated().
+- Linea 28: update() recibe PropietarioRequest.
+- Linea 30: busqueda del propietario.
+- Linea 31: actualizacion con request->validated().
+- Linea 38: eliminacion mediante Propietario.
+
+Archivo: app/Http/Controllers/Api/RutaController.php
+
+- Linea 6: uso de RutaRequest.
+- Linea 16: store() recibe RutaRequest.
+- Linea 18: creacion con request->validated().
+- Linea 28: update() recibe RutaRequest.
+- Linea 31: actualizacion con request->validated().
+
+Archivo: app/Http/Controllers/Api/TurnoController.php
+
+- Linea 6: uso de TurnoRequest.
+- Linea 16: store() recibe TurnoRequest.
+- Linea 18: creacion con request->validated().
+- Linea 28: update() recibe TurnoRequest.
+- Linea 31: actualizacion con request->validated().
+
+Controles ASVS relacionados:
+- V5.1.1: validacion de entradas.
+- V5.3.4: prevencion de asignacion masiva.
+
+6. PRUEBAS DE SEGURIDAD
+-----------------------
+
+Archivo: tests/Feature/Api/SanctumAuthenticationTest.php
+
+- Linea 38: prueba test_api_login_is_rate_limited().
+- Lineas 40-47: cinco intentos invalidos consecutivos.
+- Linea 52: sexto intento bloqueado con HTTP 429.
+
+Archivo: tests/Feature/Api/AsignacionTurnoDriverApiTest.php
+
+- Linea 190: intento de iniciar una asignacion ajena.
+- Linea 192: comprobacion de HTTP 403.
+
+Archivo: tests/Feature/Api/SeguimientoGpsApiTest.php
+
+- Linea 233: prueba de reporte GPS para asignacion ajena.
+- Linea 247: envio de GPS a una asignacion de otro conductor.
+- Linea 252: comprobacion de HTTP 403.
+- Linea 255: prueba de fecha GPS futura.
+- Linea 259: fecha tres minutos en el futuro.
+- Lineas 262-264: comprobacion de HTTP 422 y error de validacion.
+- Linea 267: prueba de consulta de recorrido ajeno.
+- Linea 282: comprobacion de HTTP 403.
+
+7. VALIDACION EJECUTADA
+-----------------------
+
+- php artisan test tests/Feature/Api
+  Resultado: 16 pruebas aprobadas y 59 aserciones aprobadas.
+
+- vendor\bin\pint --test [archivos modificados]
+  Resultado: aprobado.
+
+- php artisan test
+  Resultado: 40 pruebas aprobadas y 2 fallidas por el comando ausente
+  l5-swagger:generate. El fallo corresponde a Swagger y no a los controles
+  de seguridad implementados.
+
+8. PENDIENTES NO IMPLEMENTADOS EN ESTA ENTREGA
+-----------------------------------------------
+
+- Policies centralizadas para todos los recursos.
+- Permisos Spatie en todos los CRUD API y rutas administrativas web.
+- API Resources para minimizar PII y coordenadas GPS.
+- Respuestas globales uniformes 401, 403, 404, 422 y 429.
+- Configuracion pendiente de l5-swagger.
+- APP_DEBUG=false, HTTPS y CORS restringido para produccion.
+- Rotacion de la credencial SMTP expuesta en .env.

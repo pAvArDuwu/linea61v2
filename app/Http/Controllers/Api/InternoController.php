@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\InternoRequest;
 use App\Models\Interno;
-use Illuminate\Http\Request;
 
 class InternoController extends Controller
 {
@@ -13,9 +13,9 @@ class InternoController extends Controller
         return response()->json(Interno::all());
     }
 
-    public function store(Request $request)
+    public function store(InternoRequest $request)
     {
-        $interno = Interno::create($request->all());
+        $interno = Interno::create($request->validated());
 
         return response()->json($interno, 201);
     }
@@ -25,10 +25,10 @@ class InternoController extends Controller
         return response()->json(Interno::findOrFail($id));
     }
 
-    public function update(Request $request, string $id)
+    public function update(InternoRequest $request, string $id)
     {
         $interno = Interno::findOrFail($id);
-        $interno->update($request->all());
+        $interno->update($request->validated());
 
         return response()->json($interno);
     }
