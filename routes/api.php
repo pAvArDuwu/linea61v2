@@ -19,14 +19,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me',       [AuthController::class, 'me']);
     Route::post('/logout',  [AuthController::class, 'logout']);
 
-    Route::apiResource('conductores', ConductorController::class)->parameters(['conductores' => 'conductor']);
-    Route::apiResource('propietarios', PropietarioController::class);
-    Route::apiResource('internos', InternoController::class);
-    Route::apiResource('micros', MicroController::class);
-    Route::apiResource('rutas', RutaController::class);
-    Route::apiResource('paradas', ParadaController::class);
-    Route::apiResource('turnos', TurnoController::class);
-    Route::apiResource('asignacion-turnos', AsignacionTurnoApi::class);
+    Route::middleware('role:admin')->group(function () {
+        Route::apiResource('conductores', ConductorController::class)->parameters(['conductores' => 'conductor']);
+        Route::apiResource('propietarios', PropietarioController::class);
+        Route::apiResource('internos', InternoController::class);
+        Route::apiResource('micros', MicroController::class);
+        Route::apiResource('rutas', RutaController::class);
+        Route::apiResource('paradas', ParadaController::class);
+        Route::apiResource('turnos', TurnoController::class);
+        Route::apiResource('asignacion-turnos', AsignacionTurnoApi::class);
+    });
 
     // Endpoints específicos para conductor (App móvil Linea 61)
     Route::get('/mis/asignaciones',             [AsignacionTurnoApi::class, 'misAsignaciones']);

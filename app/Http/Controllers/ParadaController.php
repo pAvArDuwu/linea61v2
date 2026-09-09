@@ -46,15 +46,15 @@ class ParadaController extends Controller
                 Rule::unique('paradas', 'nombre'),
             ],
             'referencia' => 'nullable|string|max:255',
-            'latitud' => 'required|numeric',
-            'longitud' => 'required|numeric',
+            'latitud' => 'required|numeric|between:-90,90',
+            'longitud' => 'required|numeric|between:-180,180',
             'estado' => 'required|in:activo,inactivo',
         ], [
             'nombre.unique' => 'Ya existe una parada registrada con este nombre.',
             'nombre.required' => 'El nombre de la parada es obligatorio.',
         ]);
 
-        Parada::create($request->all());
+        Parada::create($request->only(['nombre', 'referencia', 'latitud', 'longitud', 'estado']));
 
         return Redirect::route('parada.index')->with('success', 'Parada creada correctamente.');
     }
@@ -88,14 +88,14 @@ class ParadaController extends Controller
                 Rule::unique('paradas', 'nombre')->ignore($parada->id),
             ],
             'referencia' => 'nullable|string|max:255',
-            'latitud' => 'required|numeric',
-            'longitud' => 'required|numeric',
+            'latitud' => 'required|numeric|between:-90,90',
+            'longitud' => 'required|numeric|between:-180,180',
             'estado' => 'required|in:activo,inactivo',
         ], [
             'nombre.unique' => 'Ya existe otra parada registrada con este nombre.',
         ]);
 
-        $parada->update($request->all());
+        $parada->update($request->only(['nombre', 'referencia', 'latitud', 'longitud', 'estado']));
 
         return Redirect::route('parada.index')->with('success', 'Parada actualizada correctamente.');
     }

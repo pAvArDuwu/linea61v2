@@ -120,6 +120,12 @@ let stopMarkers = [];
 let unidadSeleccionadaId = null;
 let unidadesData = [];
 
+function escapeHtml(value) {
+    const element = document.createElement('div');
+    element.textContent = value ?? '';
+    return element.innerHTML;
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     // Inicializar Mapa centrado en Santa Cruz / Cochabamba
     map = L.map('mapaMonitoreo').setView([-17.7830, -63.1820], 14);
@@ -173,13 +179,13 @@ function renderListaUnidades() {
             <div class="p-3 mb-2 rounded-3 border cursor-pointer ${isSelected ? 'border-primary bg-light' : 'bg-white'}"
                  onclick="seleccionarUnidad(${u.asignacion_id})" style="cursor: pointer; transition: all 0.2s;">
                 <div class="d-flex justify-content-between align-items-center mb-1">
-                    <span class="fw-bold text-dark">${u.placa} <span class="badge bg-light text-primary border ms-1">Int. ${u.interno}</span></span>
-                    <span class="badge ${u.estado === 'en_curso' ? 'bg-primary' : 'bg-warning'} text-uppercase" style="font-size: 0.68rem;">${u.estado}</span>
+                    <span class="fw-bold text-dark">${escapeHtml(u.placa)} <span class="badge bg-light text-primary border ms-1">Int. ${escapeHtml(u.interno)}</span></span>
+                    <span class="badge ${u.estado === 'en_curso' ? 'bg-primary' : 'bg-warning'} text-uppercase" style="font-size: 0.68rem;">${escapeHtml(u.estado)}</span>
                 </div>
-                <div class="small text-muted"><i class="bi bi-person-fill me-1"></i>${u.conductor}</div>
+                <div class="small text-muted"><i class="bi bi-person-fill me-1"></i>${escapeHtml(u.conductor)}</div>
                 <div class="d-flex justify-content-between align-items-center mt-2 small text-muted">
-                    <span><i class="bi bi-speedometer2 me-1"></i>${u.velocidad} km/h</span>
-                    <span><i class="bi bi-clock me-1"></i>${u.ultima_actualizacion}</span>
+                    <span><i class="bi bi-speedometer2 me-1"></i>${escapeHtml(u.velocidad)} km/h</span>
+                    <span><i class="bi bi-clock me-1"></i>${escapeHtml(u.ultima_actualizacion)}</span>
                 </div>
             </div>
         `;
@@ -203,11 +209,11 @@ function renderMapaMarkers() {
             const marker = L.marker([u.latitud, u.longitud], { icon: icon })
                 .bindPopup(`
                     <div class="p-1">
-                        <strong>${u.placa} (Int. ${u.interno})</strong><br>
-                        <span>Conductor: ${u.conductor}</span><br>
-                        <span>Ruta: ${u.ruta} (${u.sentido})</span><br>
-                        <span>Velocidad: ${u.velocidad} km/h</span><br>
-                        <span>Actualizado: ${u.ultima_actualizacion}</span>
+                        <strong>${escapeHtml(u.placa)} (Int. ${escapeHtml(u.interno)})</strong><br>
+                        <span>Conductor: ${escapeHtml(u.conductor)}</span><br>
+                        <span>Ruta: ${escapeHtml(u.ruta)} (${escapeHtml(u.sentido)})</span><br>
+                        <span>Velocidad: ${escapeHtml(u.velocidad)} km/h</span><br>
+                        <span>Actualizado: ${escapeHtml(u.ultima_actualizacion)}</span>
                     </div>
                 `)
                 .on('click', () => seleccionarUnidad(u.asignacion_id))
@@ -241,15 +247,15 @@ function seleccionarUnidad(asignacionId) {
 
             const stopIcon = L.divIcon({
                 className: `custom-stop-marker ${p.cumplida ? 'cumplida' : ''}`,
-                html: `${p.orden}`,
+                html: `${escapeHtml(p.orden)}`,
                 iconSize: [24, 24],
                 iconAnchor: [12, 12],
             });
 
             const sm = L.marker([p.latitud, p.longitud], { icon: stopIcon })
                 .bindPopup(`
-                    <strong>Parada #${p.orden}: ${p.nombre}</strong><br>
-                    <span>Estado: ${p.cumplida ? '✅ Cumplida (' + p.hora_cumplida + ')' : '⏳ Pendiente'}</span>
+                    <strong>Parada #${escapeHtml(p.orden)}: ${escapeHtml(p.nombre)}</strong><br>
+                    <span>Estado: ${p.cumplida ? 'Cumplida (' + escapeHtml(p.hora_cumplida) + ')' : 'Pendiente'}</span>
                 `)
                 .addTo(map);
 
@@ -281,16 +287,16 @@ function renderControlParadas(u) {
             <div class="d-flex align-items-center justify-content-between p-2 mb-2 rounded-2 ${p.cumplida ? 'bg-success-subtle border border-success' : 'bg-light border'}">
                 <div class="d-flex align-items-center gap-2">
                     <span class="badge ${p.cumplida ? 'bg-success' : 'bg-secondary'} rounded-circle" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
-                        ${p.orden}
+                        ${escapeHtml(p.orden)}
                     </span>
                     <div>
-                        <div class="fw-semibold text-dark small">${p.nombre}</div>
+                        <div class="fw-semibold text-dark small">${escapeHtml(p.nombre)}</div>
                         ${isLast ? '<span class="badge bg-primary text-white" style="font-size: 0.65rem;">Cierre Automático</span>' : ''}
                     </div>
                 </div>
                 <div>
                     ${p.cumplida
-                        ? `<span class="badge bg-success small"><i class="bi bi-check-lg me-1"></i>${p.hora_cumplida || 'Cumplido'}</span>`
+                        ? `<span class="badge bg-success small"><i class="bi bi-check-lg me-1"></i>${escapeHtml(p.hora_cumplida || 'Cumplido')}</span>`
                         : `<span class="badge bg-secondary-subtle text-muted small">Pendiente</span>`
                     }
                 </div>

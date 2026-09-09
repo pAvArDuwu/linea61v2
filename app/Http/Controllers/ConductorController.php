@@ -55,7 +55,7 @@ class ConductorController extends Controller
             'user_id' => ['required', 'integer', 'exists:users,id', Rule::unique('conductor', 'user_id')],
         ]);
 
-        Conductor::create($request->all());
+        Conductor::create($request->only(['estado', 'licencia', 'user_id']));
 
         return redirect()->route('conductor.index')->with('success', 'Conductor creado con éxito.');
     }
@@ -93,7 +93,7 @@ class ConductorController extends Controller
             'user_id' => ['nullable', 'integer', 'exists:users,id', Rule::unique('conductor', 'user_id')->ignore($conductor->id)],
         ]);
 
-        $conductor->update($request->all());
+        $conductor->update($request->only(['estado', 'licencia', 'user_id']));
 
         return redirect()->route('conductor.index')->with('success', 'Conductor actualizado con éxito.');
     }

@@ -10,7 +10,7 @@ class PropietarioController extends Controller
 {
     public function index()
     {
-        return response()->json(Dueño::all());
+        return response()->json(Propietario::all());
     }
 
     public function store(PropietarioRequest $request)
@@ -22,7 +22,7 @@ class PropietarioController extends Controller
 
     public function show(string $id)
     {
-        return response()->json(Dueño::findOrFail($id));
+        return response()->json(Propietario::findOrFail($id));
     }
 
     public function update(PropietarioRequest $request, string $id)

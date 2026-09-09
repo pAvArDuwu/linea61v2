@@ -1,6 +1,8 @@
 INFORME DE CAMBIOS DE SEGURIDAD
 OWASP ASVS 4.0.3
 
+INFORME COMPLEMENTARIO DE IMPLEMENTACION Y AUDITORIA OWASP ASVS 4.0.3
+
 Proyecto: icontrol-seguimiento-lineas-main
 Alcance: proyecto raiz exclusivamente
 Fecha: 2026-09-08
@@ -226,3 +228,542 @@ Fallo pendiente:
 - No se modifico deliberadamente el archivo eliminado
   SDD_actualizado_linea_control_v2_revisado.txt, ya que ese cambio aparecia
   como preexistente y no corresponde a esta entrega.
+
+8. TRAZABILIDAD CONSOLIDADA DE IMPLEMENTACION ASVS
+---------------------------------------------------
+
+Esta seccion integra la descripcion tecnica de cada control con sus riesgos,
+archivos, carpetas, funciones, lineas actuales, motivo, beneficio, pruebas y
+estado. Las referencias de linea corresponden al estado del proyecto al
+generar este informe y pueden desplazarse si se formatean los archivos.
+
+8.1 V2.1.1/V2.1.2 - AUTENTICACION Y CREDENCIALES
+------------------------------------------------
+
+Riesgo identificado:
+Un login sin validacion consistente podia permitir autenticacion incorrecta,
+respuestas ambiguas o acceso a endpoints sin identidad comprobada.
+
+Implementacion realizada:
+- app/Http/Controllers/Api/AuthController.php, carpeta de controladores API:
+  login(), me() y logout(), lineas 10-18 y 25-35.
+- app/Http/Requests/Auth/LoginRequest.php, carpeta de FormRequests:
+  rules() y authenticate(), lineas 24-46.
+- routes/api.php, grupo auth:sanctum, linea 18.
+- El login recibe LoginRequest, ejecuta authenticate(), utiliza validated(),
+  emite Sanctum y revoca el token actual al cerrar sesion.
+
+Motivo y beneficio:
+Se valida la identidad antes de emitir credenciales y se reducen entradas no
+controladas. El beneficio es proteger los endpoints autenticados y centralizar
+el proceso de autenticacion.
+
+Estado: implementado para login API, token Sanctum, /me y logout.
+
+8.2 V2.2.1 - PROTECCION CONTRA FUERZA BRUTA
+-------------------------------------------
+
+Riesgo identificado:
+Un atacante podia repetir intentos de contrasena contra una cuenta sin una
+barrera temporal suficiente.
+
+Implementacion realizada:
+- LoginRequest.php, authenticate(), ensureIsNotRateLimited() y throttleKey(),
+  lineas 42-83: RateLimiter, Lockout y clave email/IP.
+- routes/api.php, linea 15: throttle:5,1 en POST /api/login.
+- tests/Feature/Api/SanctumAuthenticationTest.php, prueba
+  test_api_login_is_rate_limited(), lineas 38-55.
+
+Motivo y beneficio:
+Se limita la automatizacion de ataques y se devuelve HTTP 429 tras superar el
+limite de cinco intentos.
+
+Estado: implementado y probado.
+
+8.3 V4.1.1 - MINIMO PRIVILEGIO Y CONTROL DE ACCESO
+--------------------------------------------------
+
+Riesgo identificado:
+auth:sanctum y auth verificaban identidad, pero no impedían que cualquier
+usuario autenticado ejecutara funciones administrativas.
+
+Implementacion realizada:
+- routes/api.php, lineas 22-31: CRUD administrativos dentro de role:admin.
+- routes/web.php, lineas 39-45: roles, asignacion de roles y users dentro de
+  role:admin.
+- tests/Feature/Api/ConductorCrudTest.php, acceso permitido y denegado,
+  lineas 13-25 y 58-65.
+- Los endpoints /mis/* mantienen autenticacion Sanctum y control por
+  conductor.
+
+Motivo y beneficio:
+Se separa autenticacion de autorizacion, reduciendo escalada de privilegios y
+limitando operaciones administrativas.
+
+Estado: parcial. La frontera auditada esta protegida; faltan Policies y
+permisos granulares para todos los objetos.
+
+8.4 V4.2.1 - AUTORIZACION POR OBJETO Y BOLA/IDOR
+------------------------------------------------
+
+Riesgo identificado:
+Un conductor podia cambiar un ID para iniciar, finalizar, consultar o enviar
+GPS sobre una asignacion de otro conductor.
+
+Implementacion realizada:
+- app/Http/Controllers/Api/AsignacionTurnoApi.php, iniciar() y finalizar(),
+  lineas 151-196: comprueban conductor_id y devuelven 403.
+- app/Http/Controllers/Api/SeguimientoGpsApiController.php,
+  guardarUbicacion(), sincronizarLote(), estadoRecorrido() y
+  usuarioPuedeAcceder(), lineas 16-86.
+- tests/Feature/Api/AsignacionTurnoDriverApiTest.php, lineas 190-192.
+- tests/Feature/Api/SeguimientoGpsApiTest.php, lineas 233-282.
+
+Motivo y beneficio:
+Se autoriza el objeto concreto, no solo el endpoint. Se protegen asignaciones,
+posiciones GPS, recorridos y paradas contra BOLA/IDOR.
+
+Estado: parcial. Implementado para asignaciones y GPS; faltan Policies para
+centralizar autorizacion en todos los modelos API.
+
+8.5 V5.1.1 - VALIDACION DEL LADO SERVIDOR
+------------------------------------------
+
+Riesgo identificado:
+Coordenadas invalidas, fechas futuras, velocidades negativas, lotes excesivos
+o campos no previstos podian contaminar datos operativos.
+
+Implementacion realizada:
+- app/Http/Requests/Api/StoreUbicacionGpsRequest.php, rules(), lineas 13-39:
+  Carbon, latitud -90..90, longitud -180..180 y velocidad no negativa.
+- app/Http/Requests/Api/SincronizarUbicacionesGpsRequest.php, rules(),
+  lineas 13-45: lote de 1 a 300 y validacion por ubicacion.
+- CRUD API de Interno, Micro, Parada, Propietario, Ruta y Turno: store() y
+  update() usan FormRequests y validated(), normalmente lineas 14-31.
+- app/Http/Controllers/ParadaController.php, store() y update(),
+  lineas 39-100: limites geograficos.
+
+Motivo y beneficio:
+Se rechazan datos invalidos antes de llegar al modelo o servicio, mejorando
+integridad de datos y reduciendo abuso de API.
+
+Estado: implementado en los flujos auditados; debe homogeneizarse en los
+controladores web restantes.
+
+8.6 V5.3.4 - PREVENCION DE MASS ASSIGNMENT
+------------------------------------------
+
+Riesgo identificado:
+request->all() podia aceptar campos internos como estados, relaciones o IDs no
+previstos y provocar cambios no autorizados.
+
+Implementacion realizada:
+- CRUD API de Interno, Micro, Parada, Propietario, Ruta y Turno usa
+  FormRequest::validated(), en store() y update(), lineas 16-31.
+- app/Http/Controllers/ConductorController.php, store() y update(),
+  lineas 58 y 96: only(['estado', 'licencia', 'user_id']).
+- app/Http/Controllers/ParadaController.php, store() y update(),
+  lineas 57 y 98: only() con nombre, referencia, latitud, longitud y estado.
+
+Motivo y beneficio:
+Se persisten solo campos expresamente permitidos, reduciendo manipulacion de
+atributos, escalada de privilegios y corrupcion de estados.
+
+Estado: implementado en los controladores auditados.
+
+8.7 V13.1.1/V13.2.1 - SEGURIDAD Y LIMITES DE API
+------------------------------------------------
+
+Riesgo identificado:
+Endpoints sin limites o sin autorizacion podian ser abusados mediante
+solicitudes repetidas, lotes GPS excesivos o acceso a datos operativos ajenos.
+
+Implementacion realizada:
+- routes/api.php, lineas 15, 18-31 y 40-44: Sanctum, throttle de login,
+  role:admin y throttle GPS 120 por minuto.
+- SincronizarUbicacionesGpsRequest.php, linea 19: maximo 300 ubicaciones.
+- SeguimientoGpsApiController.php, lineas 24-71: pertenencia del conductor.
+
+Motivo y beneficio:
+Se limita consumo, se protege disponibilidad y se reduce la superficie de
+ataque de los endpoints de negocio.
+
+Estado: parcial. Faltan respuestas uniformes, API Resources y permisos
+granulares por endpoint.
+
+8.8 V4.3.1 - AUTORIZACION DE FUNCIONES ADMINISTRATIVAS
+------------------------------------------------------
+
+Riesgo identificado:
+Un usuario autenticado podia acceder a CRUD de usuarios, roles, permisos o
+recursos operativos sin una barrera administrativa explicita.
+
+Implementacion realizada:
+- routes/api.php, lineas 22-31: apiResource administrativos bajo role:admin.
+- routes/web.php, lineas 39-45: roles, asignacion de roles y users bajo
+  role:admin.
+- tests/Feature/Api/ConductorCrudTest.php, linea 65: assertForbidden().
+- RolesController.php y UserController.php quedan protegidos por sus rutas.
+
+Motivo y beneficio:
+Se evita confundir autenticacion basica con autorizacion administrativa y se
+impide que usuarios no administradores gestionen recursos criticos.
+
+Estado: implementado para los grupos indicados. Policies y permisos por
+accion quedan como mejora de autorizacion fina.
+
+8.9 V5.3.3 - CODIFICACION DE SALIDA Y PREVENCION DE XSS
+-------------------------------------------------------
+
+Riesgo identificado:
+resources/views/monitoreo/index.blade.php construia HTML y popups Leaflet con
+innerHTML usando placas, conductores, rutas, paradas y horarios. Un valor
+malicioso almacenado podia ejecutar JavaScript en el navegador del operador.
+
+Implementacion realizada:
+- resources/views/monitoreo/index.blade.php, escapeHtml(), linea 123.
+- Usos principales en renderListaUnidades(), renderMapaMarkers(),
+  seleccionarUnidad() y renderControlParadas(), lineas 171-216, 250-258 y
+  279-306.
+- La funcion usa textContent para escapar valores antes de insertarlos.
+
+Motivo y beneficio:
+Se impide que datos de base de datos sean interpretados como HTML o JavaScript,
+reduciendo XSS almacenado y XSS DOM.
+
+Estado: implementado en la vista auditada. Otras vistas dinamicas deben
+revisarse posteriormente.
+
+8.10 V9.1.1 - COMUNICACIONES SEGURAS Y COOKIES HTTPS
+----------------------------------------------------
+
+Riesgo identificado:
+SESSION_SECURE_COOKIE podia quedar vacio y permitir que una cookie se enviara
+por HTTP si la infraestructura no aplicaba HTTPS.
+
+Implementacion realizada:
+- config/session.php, linea 172: Secure automatico cuando APP_ENV es
+  production, salvo configuracion explicita.
+- .env.example, linea 35: SESSION_SECURE_COOKIE=false para Laragon local.
+- Se conservaron http_only=true y same_site=lax.
+
+Motivo y beneficio:
+Se protegen sesiones en produccion sin romper el entorno local HTTP y se
+reduce el riesgo de robo de sesiones por transporte no cifrado.
+
+Estado: parcial. Falta configurar TLS real, APP_URL HTTPS y APP_DEBUG=false.
+
+9. CORRECCIONES FUNCIONALES Y DE SEGURIDAD RELACIONADAS
+-------------------------------------------------------
+
+9.1 Referencia de modelo Propietario
+- Archivo: app/Http/Controllers/Api/PropietarioController.php.
+- Funciones: index() y show(), lineas 13 y 25.
+- Problema: llamaba a Dueño aunque el modelo importado era Propietario.
+- Solucion: Propietario::all() y Propietario::findOrFail($id).
+- Beneficio: evita error HTTP 500 y recupera disponibilidad del CRUD API.
+
+9.2 Mass assignment residual en web
+- Archivos: ConductorController.php y ParadaController.php.
+- Problema: utilizaban request->all().
+- Solucion: se reemplazo por only() con campos permitidos.
+- Beneficio: evita persistir atributos no previstos por el formulario.
+
+9.3 Validacion de coordenadas de paradas
+- Archivo: app/Http/Controllers/ParadaController.php.
+- Funciones: store() y update(), lineas 39-100.
+- Solucion: latitud between:-90,90 y longitud between:-180,180.
+- Beneficio: evita coordenadas geograficamente imposibles.
+
+10. PRUEBAS DE SEGURIDAD
+------------------------
+
+Archivos de pruebas:
+- tests/Feature/Api/SanctumAuthenticationTest.php: login, token, logout y
+  rate limiting; sexto intento HTTP 429.
+- tests/Feature/Api/AsignacionTurnoDriverApiTest.php: asignacion propia y
+  rechazo de asignacion ajena con HTTP 403.
+- tests/Feature/Api/SeguimientoGpsApiTest.php: GPS, deduplicacion, finalizacion
+  automatica, lote offline, GPS ajeno HTTP 403, fecha futura HTTP 422 y
+  recorrido ajeno HTTP 403.
+- tests/Feature/Api/ConductorCrudTest.php: admin permitido, usuario no admin
+  HTTP 403 y usuario sin token HTTP 401.
+
+Resultados:
+- php artisan test tests/Feature/Api: 60 aserciones aprobadas y 17
+  advertencias de file_get_contents; sin fallos de asercion.
+- php artisan route:list --path=api: 52 rutas registradas.
+- git diff --check: correcto.
+- La suite completa requirio una APP_KEY temporal porque no existe .env.
+  Resultado: 1 fallo y 42 advertencias; el fallo fue ProfileTest con HTTP 500
+  y no corresponde a los archivos modificados.
+- Pint --test detecto reglas de formato pendientes en archivos existentes. No
+  se aplico formateo masivo para evitar cambios ajenos a seguridad.
+
+11. V2.4 Y CONTROLES PENDIENTES
+-------------------------------
+
+V2.4 - almacenamiento de credenciales:
+No se declara como implementado en esta entrega. User.php usa el cast
+password => hashed, pero no se agrego una prueba completa de politica de
+contrasenas, rotacion, historial, bloqueo o auditoria de almacenamiento.
+
+Pendientes adicionales:
+- Policies centralizadas para todos los modelos.
+- Permisos Spatie por accion en todos los CRUD.
+- API Resources para minimizar PII y coordenadas GPS.
+- Respuestas globales uniformes 401, 403, 404, 422 y 429.
+- APP_DEBUG=false, HTTPS real y CORS restringido.
+- Revision del acceso publico a Swagger.
+- Rotacion de cualquier credencial SMTP expuesta.
+
+12. CAMBIOS FUERA DEL ALCANCE
+-----------------------------
+
+- La carpeta linea57_control no forma parte de esta implementacion.
+- No se realizaron cambios de arquitectura ni migracion de framework.
+- El archivo plan_refactorizacion_mvc_verificado.txt aparece eliminado en el
+  estado de Git previo y no fue restaurado ni modificado.
+
+13. CONCLUSION
+--------------
+
+Este documento consolida los dos informes anteriores en un solo registro de
+implementacion ASVS 4.0.3. Contiene la descripcion, riesgo, solucion,
+carpeta, archivo, funcion, lineas, motivo, beneficio, pruebas, errores y
+pendientes de los diez controles tratados.
+
+La arquitectura MVC, Sanctum, FormRequests, servicios y pruebas Feature fueron
+conservados. El proyecto no debe presentarse como cumplimiento integral de
+ASVS 4.0.3 hasta completar Policies, minimizacion de respuestas, HTTPS real,
+CORS, Swagger y la auditoria especifica de V2.4.
+
+8. IMPLEMENTACION COMPLEMENTARIA DE TRES CONTROLES ASVS
+--------------------------------------------------------
+
+La implementacion complementaria mantuvo la arquitectura MVC de Laravel.
+Se utilizaron rutas, middleware, controladores, configuracion, vistas y
+pruebas existentes. No se crearon controladores independientes ni se cambio
+el framework.
+
+8.1 ASVS V4.3.1: autorizacion de funciones administrativas
+-----------------------------------------------------------
+
+Vulnerabilidad encontrada:
+- Las rutas CRUD API y las rutas web de usuarios y roles requerian autenticacion,
+  pero no restringian las funciones administrativas por rol.
+- auth:sanctum y auth verifican la identidad, pero no autorizan por funcion.
+
+Archivos modificados:
+- routes/api.php
+- routes/web.php
+- tests/Feature/Api/ConductorCrudTest.php
+
+Implementacion:
+- Los apiResource administrativos de conductores, propietarios, internos,
+  micros, rutas, paradas, turnos y asignaciones quedaron dentro de
+  middleware role:admin.
+- Las rutas web de roles, asignacion de roles y users quedaron dentro de
+  middleware role:admin.
+- Los endpoints moviles /mis/asignaciones y GPS conservaron auth:sanctum y
+  su comprobacion de pertenencia al conductor.
+- Se agrego una prueba donde un usuario autenticado sin admin recibe 403.
+- La prueba administrativa crea el rol admin en su preparacion para no
+  depender de seeders externos.
+
+Beneficio:
+- Se reduce el riesgo de escalada de privilegios y modificacion no autorizada
+  de informacion operativa.
+- Se aplica minimo privilegio a funciones administrativas.
+
+8.2 ASVS V5.3.3: codificacion de salida y prevencion de XSS
+------------------------------------------------------------
+
+Vulnerabilidad encontrada:
+- resources/views/monitoreo/index.blade.php insertaba datos de conductor,
+  ruta, parada, placa y horarios mediante innerHTML y HTML de Leaflet.
+- Un valor malicioso almacenado en la base de datos podia ejecutarse en el
+  navegador de un operador.
+
+Archivo modificado:
+- resources/views/monitoreo/index.blade.php
+
+Implementacion:
+- Se agrego escapeHtml(), basado en textContent, para codificar valores antes
+  de insertarlos en HTML.
+- Se protegieron los datos dinamicos de renderListaUnidades(),
+  renderMapaMarkers(), seleccionarUnidad() y renderControlParadas().
+- Se mantuvieron sin cambios las clases CSS y los estados internos que no
+  proceden de entrada del usuario.
+
+Beneficio:
+- Se reduce el riesgo de XSS almacenado y XSS basado en DOM.
+- Se evita que datos de negocio se interpreten como codigo en el navegador.
+
+8.3 ASVS V9.1.1: comunicaciones seguras y cookies HTTPS
+--------------------------------------------------------
+
+Riesgo encontrado:
+- La cookie de sesion dependia de SESSION_SECURE_COOKIE y podia quedar sin
+  atributo Secure si la variable no estaba configurada en produccion.
+
+Archivos modificados:
+- config/session.php
+- .env.example
+
+Implementacion:
+- config/session.php activa Secure automaticamente cuando APP_ENV es
+  production, salvo configuracion explicita de SESSION_SECURE_COOKIE.
+- .env.example declara SESSION_SECURE_COOKIE=false para el entorno local.
+- Se conservaron http_only=true y same_site=lax.
+- El entorno local HTTP de Laragon no fue forzado a HTTPS.
+
+Beneficio:
+- Las cookies de sesion no se envian por HTTP en produccion.
+- Se reduce el riesgo de robo de sesiones durante el transporte.
+- Se mantiene el funcionamiento local sin cambios de infraestructura.
+
+9. CORRECCIONES TECNICAS RELACIONADAS
+--------------------------------------
+
+9.1 Error de modelo en PropietarioController
+---------------------------------------------
+
+Problema:
+- app/Http/Controllers/Api/PropietarioController.php importaba Propietario,
+  pero index() y show() llamaban a Dueño.
+
+Solucion:
+- Se reemplazo Dueño::all() por Propietario::all().
+- Se reemplazo Dueño::findOrFail($id) por Propietario::findOrFail($id).
+
+Resultado:
+- Se elimina el error de clase inexistente en esas operaciones API.
+
+9.2 Mass assignment residual en controladores web
+-------------------------------------------------
+
+Problema:
+- app/Http/Controllers/ConductorController.php y
+  app/Http/Controllers/ParadaController.php utilizaban request->all().
+
+Solucion:
+- ConductorController usa only() con estado, licencia y user_id.
+- ParadaController usa only() con nombre, referencia, latitud, longitud y
+  estado.
+- Se mantienen las reglas de validacion existentes.
+
+Resultado:
+- No se persisten campos arbitrarios enviados por el cliente.
+
+9.3 Validacion geografica de paradas
+-------------------------------------
+
+Problema:
+- latitud y longitud se validaban solo como numeric.
+
+Solucion:
+- latitud se limita a between:-90,90.
+- longitud se limita a between:-180,180.
+
+Resultado:
+- La validacion web queda alineada con la validacion de ubicaciones GPS.
+
+10. MATRIZ FINAL DE DIEZ CONTROLES ASVS
+---------------------------------------
+
+1. V2.1.1/V2.1.2 - autenticacion y validacion de credenciales: implementado
+   en LoginRequest, AuthController y Sanctum.
+2. V2.2.1 - proteccion contra fuerza bruta: implementado en LoginRequest y
+   throttle de /api/login.
+3. V4.1.1 - control de acceso y minimo privilegio: parcial; GPS y operaciones
+   del conductor estan restringidos, y los CRUD administrativos ahora exigen
+   rol admin.
+4. V4.2.1 - autorizacion por objeto y BOLA: parcial; implementado para
+   asignaciones y GPS, pendiente de Policies para todos los recursos.
+5. V5.1.1 - validacion server-side: parcial; requests API y validacion web
+   existen, con limites GPS y geograficos reforzados.
+6. V5.3.4 - prevencion de mass assignment: parcial; APIs usan validated() y
+   los controladores web auditados ya no usan request->all().
+7. V13.1.1/V13.2.1 - seguridad y limites de APIs: parcial; Sanctum, throttle,
+   limites GPS y control de acceso estan implementados.
+8. V4.3.1 - autorizacion de funciones administrativas: implementado para
+   CRUD API y rutas web de roles y usuarios mediante role:admin.
+9. V5.3.3 - codificacion de salida y prevencion de XSS: implementado en la
+   vista de monitoreo mediante escapeHtml() antes de insertar HTML.
+10. V9.1.1 - comunicaciones seguras mediante TLS/HTTPS: parcialmente
+    automatizado; las cookies Secure se activan por defecto en produccion.
+    El certificado TLS y el HTTPS del servidor deben verificarse en despliegue.
+
+11. PRUEBAS DE VERIFICACION
+---------------------------
+
+Comandos ejecutados:
+- composer dump-autoload --no-interaction: correcto; autoload regenerado y
+  descubrimiento de paquetes completado.
+- php artisan route:list --path=api: correcto; se registraron 52 rutas API.
+- php artisan test tests/Feature/Api/ConductorCrudTest.php: correcto; 10
+  aserciones aprobadas. PHPUnit mostro tres advertencias preexistentes de
+  file_get_contents, sin fallos de asercion.
+- php artisan config:clear: correcto.
+- php artisan test tests/Feature/Api: correcto; 60 aserciones aprobadas y
+  17 advertencias de file_get_contents, sin fallos reportados.
+
+Pruebas verificadas:
+- Administrador puede gestionar conductores.
+- Usuario autenticado sin rol admin recibe HTTP 403 en CRUD administrativo.
+- Usuario sin token recibe HTTP 401.
+- Login, logout, rate limiting, GPS, sincronizacion y autorizacion por
+  asignacion continuan funcionando.
+- Las comprobaciones estaticas no encontraron errores en los archivos de
+  prueba ni en PropietarioController.
+
+12. ERRORES Y PENDIENTES
+------------------------
+
+- Las advertencias file_get_contents de PHPUnit deben revisarse en la
+  configuracion de cobertura o reportes de pruebas; no produjeron fallos ni
+  aserciones fallidas en la suite API.
+- El proveedor estatico del editor puede marcar middleware, rutas y vistas
+  como inexistentes porque no resuelve completamente el contenedor Laravel;
+  route:list y las pruebas son la validacion efectiva.
+- API Resources siguen pendientes para minimizar PII y coordenadas GPS.
+- Policies centralizadas para cada recurso siguen pendientes; role:admin cubre
+  la frontera administrativa general, pero no reemplaza autorizacion por
+  objeto en todos los modelos.
+- Debe configurarse APP_URL HTTPS, certificado TLS, CORS restringido y
+  APP_DEBUG=false en el entorno de produccion.
+- Debe revisarse el acceso publico a Swagger antes del despliegue.
+- El archivo plan_refactorizacion_mvc_verificado.txt aparece eliminado en el
+  estado de Git previo a esta implementacion y no fue restaurado ni modificado.
+
+13. CONCLUSION
+--------------
+La entrega implementa tres controles adicionales de alto impacto: V4.3.1,
+V5.3.3 y V9.1.1. Tambien corrige un error funcional de modelo, elimina
+mass assignment residual en dos controladores web y refuerza la validacion
+geografica. La arquitectura MVC, Sanctum, FormRequests, servicios y pruebas
+Feature existentes fueron conservados.
+
+La cobertura ASVS queda documentada con diez controles, de los cuales los
+controles de autorizacion por objeto, API Resources, Policies completas,
+HTTPS real y configuracion de produccion deben continuar verificandose antes
+de declarar cumplimiento integral de OWASP ASVS 4.0.3.
+
+14. ACLARACION SOBRE LA SUITE COMPLETA
+--------------------------------------
+
+La suite completa requirio una APP_KEY temporal de proceso porque el
+repositorio no contiene archivo .env. No se creo ni se modifico .env y no se
+usaron credenciales de produccion.
+
+Con esa clave temporal el resultado fue:
+- 1 prueba fallida y 42 advertencias.
+- El fallo restante corresponde a ProfileTest y devuelve HTTP 500; no afecta
+  los archivos modificados en esta entrega.
+- Las pruebas API de esta entrega finalizaron sin fallos de asercion: 60
+  aserciones aprobadas y 17 advertencias de file_get_contents.
+
+Pint --test no quedo limpio porque detecto reglas de formato pendientes en
+controladores y rutas existentes. No se aplico un formateo masivo para evitar
+ruido y cambios no relacionados con seguridad.

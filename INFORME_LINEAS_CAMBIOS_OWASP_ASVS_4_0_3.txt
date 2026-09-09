@@ -1,218 +1,438 @@
-INFORME DE LINEAS DE CODIGO MODIFICADAS
-OWASP ASVS 4.0.3
+IMPLEMENTACION DE CONTROLES OWASP ASVS 4.0.3
+TRAZABILIDAD DE ARCHIVOS, CARPETAS, FUNCIONES Y LINEAS
 
 Proyecto: icontrol-seguimiento-lineas-main
 Fecha: 2026-09-08
+Arquitectura: Laravel MVC, Sanctum, FormRequests, servicios y pruebas Feature
 
-NOTA SOBRE LAS REFERENCIAS
---------------------------
-Las referencias indican archivo y numero de linea segun el estado actual del
-proyecto al momento de generar este informe. Si se vuelve a formatear un
-archivo, los numeros pueden desplazarse.
+1. OBJETIVO Y CRITERIO DEL INFORME
+----------------------------------
 
-1. AUTENTICACION Y RATE LIMITING
---------------------------------
+Este informe describe los controles OWASP ASVS 4.0.3 implementados en el
+proyecto. Para cada control se indica la vulnerabilidad, la solucion, la
+carpeta, el archivo, la funcion, las lineas actuales, el motivo, el beneficio
+y el estado real.
 
-Archivo: app/Http/Controllers/Api/AuthController.php
+Las lineas corresponden al estado actual del repositorio al generar este
+documento. Un formateo posterior puede desplazar sus numeros.
 
-- Linea 6: importacion de LoginRequest.
-- Linea 12: login() recibe LoginRequest en lugar de Request generico.
-- Linea 14: ejecucion de $request->authenticate().
-- Linea 15: lectura exclusiva de datos validados.
-- Linea 18: creacion del token Sanctum.
-- Linea 32: metodo logout() para revocar el token actual.
+No se modifico la arquitectura MVC ni se crearon controladores innecesarios.
+Los controles se aplicaron en rutas, controladores, FormRequests, vistas,
+configuracion y pruebas ya existentes.
 
-Archivo: app/Http/Requests/Auth/LoginRequest.php
+2. MATRIZ GENERAL DE CONTROLES
+------------------------------
 
-- Linea 33: validacion de device_name con limite de 255 caracteres.
-- Linea 42: metodo authenticate().
-- Lineas 60-75: control de intentos y bloqueo mediante RateLimiter.
-- Lineas 80-83: clave de limitacion usando email e IP.
+1. V2.1.1/V2.1.2 - autenticacion y validacion de credenciales: implementado.
+2. V2.2.1 - proteccion contra fuerza bruta: implementado.
+3. V4.1.1 - control de acceso y minimo privilegio: parcial.
+4. V4.2.1 - autorizacion por objeto y prevencion de BOLA: parcial.
+5. V5.1.1 - validacion del lado servidor: implementado en los flujos auditados.
+6. V5.3.4 - prevencion de mass assignment: implementado en los flujos auditados.
+7. V13.1.1/V13.2.1 - seguridad y limites de API: parcial.
+8. V4.3.1 - autorizacion de funciones administrativas: implementado para las
+   fronteras administrativas protegidas.
+9. V5.3.3 - codificacion de salida y prevencion de XSS: implementado en la
+   vista de monitoreo auditada.
+10. V9.1.1 - comunicaciones seguras: parcialmente automatizado; requiere TLS
+    real y configuracion de produccion.
 
-Archivo: routes/api.php
+3. V2.1.1/V2.1.2 - AUTENTICACION Y CREDENCIALES
+------------------------------------------------
 
-- Linea 15: POST /api/login protegido con throttle:5,1.
+Descripcion:
+El sistema valida las credenciales en servidor antes de permitir acceso a la
+API protegida.
 
-Control ASVS relacionado:
-- V2.1.1 / V2.1.2: autenticacion.
-- V2.2.1: proteccion contra fuerza bruta.
+Riesgo:
+Un login sin validacion consistente podia permitir autenticacion incorrecta,
+respuestas ambiguas o acceso a endpoints sin identidad comprobada.
 
-2. AUTORIZACION DE ASIGNACIONES
--------------------------------
+Que se hizo:
+- El login recibe LoginRequest.
+- Se ejecuta authenticate() antes de crear el token.
+- Solo se utilizan datos de validated().
+- Sanctum emite tokens y logout revoca el token actual.
 
-Archivo: app/Http/Controllers/Api/AsignacionTurnoApi.php
+Donde se implemento:
+- app/Http/Controllers/Api/AuthController.php
+  Funciones login(), me(), logout(); lineas 10-18 y 25-35.
+- app/Http/Requests/Auth/LoginRequest.php
+  Funciones rules() y authenticate(); lineas 24-46.
+- routes/api.php
+  Grupo auth:sanctum; linea 18.
 
-- Linea 177: inicio de la accion iniciar().
-- Linea 179: busqueda de la asignacion solicitada.
-- Linea 183: respuesta HTTP 403 para una asignacion no autorizada.
-- Linea 199: inicio de la accion finalizar().
-- Linea 201: busqueda de la asignacion solicitada.
-- Linea 205: respuesta HTTP 403 para una asignacion no autorizada.
+Por que:
+Para comprobar la identidad antes de emitir credenciales API y evitar campos
+no validados.
 
-Control ASVS relacionado:
-- V4.1.1: minimo privilegio.
-- V4.2.1: autorizacion a nivel de objeto y prevencion de BOLA.
+Beneficio:
+Centraliza autenticacion, reduce entradas inesperadas y protege endpoints.
 
-3. AUTORIZACION Y PROTECCION GPS
---------------------------------
+Estado: implementado para login API, token Sanctum, /me y logout.
 
-Archivo: app/Http/Controllers/Api/SeguimientoGpsApiController.php
+4. V2.2.1 - PROTECCION CONTRA FUERZA BRUTA
+-------------------------------------------
 
-- Linea 22: guardarUbicacion() recibe el request validado y el ID de asignacion.
-- Linea 24: busqueda controlada de la asignacion.
-- Linea 26: comprobacion de pertenencia del usuario a la asignacion.
-- Linea 29: respuesta HTTP 403 si el usuario no puede reportar GPS.
-- Linea 32: uso de datos validados para registrar el punto.
-- Linea 43: sincronizarLote() para ubicaciones offline.
-- Linea 45: busqueda de la asignacion del lote.
-- Linea 47: comprobacion de pertenencia en sincronizacion.
-- Linea 50: respuesta HTTP 403 para sincronizacion no autorizada.
-- Linea 53: envio del lote al servicio con los datos recibidos.
-- Linea 64: estadoRecorrido() para consultar el recorrido.
-- Linea 66: busqueda de la asignacion consultada.
-- Linea 68: comprobacion de pertenencia antes de devolver datos.
-- Linea 71: respuesta HTTP 403 para recorrido ajeno.
-- Linea 74: carga de relaciones del recorrido y ultima posicion.
-- Linea 89: metodo privado usuarioPuedeAcceder().
-- Linea 93: comparacion del conductor autenticado con el conductor asignado.
+Descripcion:
+El login limita intentos repetidos y aplica bloqueo temporal.
 
-Controles ASVS relacionados:
-- V4.2.1: control de acceso a nivel de objeto.
-- V8.3.1: proteccion de datos sensibles y localizacion.
-- V13.1.1 / V13.2.1: seguridad de API.
+Riesgo:
+Sin limite, un atacante podia probar contrasenas repetidamente contra una
+cuenta hasta encontrar una credencial valida.
 
-4. VALIDACION DE GPS
---------------------
+Que se hizo:
+- RateLimiter limita a cinco intentos.
+- La clave combina email e IP.
+- Se dispara Lockout al superar el limite.
+- /api/login usa throttle:5,1.
 
-Archivo: app/Http/Requests/Api/StoreUbicacionGpsRequest.php
+Donde se implemento:
+- app/Http/Requests/Auth/LoginRequest.php
+  Funciones authenticate(), ensureIsNotRateLimited(), throttleKey();
+  lineas 42-83.
+- routes/api.php, linea 15.
+- tests/Feature/Api/SanctumAuthenticationTest.php
+  test_api_login_is_rate_limited(); lineas 38-55.
 
-- Linea 5: importacion de Carbon.
-- Lineas 18-30: validacion de fecha_hora_gps.
-- Linea 23: conversion segura de la fecha recibida.
-- Linea 28: rechazo de fechas posteriores a ahora mas dos minutos.
-- Lineas 32-34: limites de latitud, longitud y velocidad.
+Por que:
+Para impedir ataques automatizados contra autenticacion.
 
-Archivo: app/Http/Requests/Api/SincronizarUbicacionesGpsRequest.php
+Beneficio:
+Reduce la velocidad de prueba de contrasenas y devuelve HTTP 429 al superar
+el limite.
 
-- Linea 5: importacion de Carbon.
-- Linea 19: limite del lote entre 1 y 300 ubicaciones.
-- Lineas 20-32: validacion de fecha GPS para cada ubicacion.
-- Linea 25: conversion segura de la fecha recibida.
-- Linea 30: rechazo de fechas futuras fuera del margen permitido.
-- Lineas 35-37: limites de latitud, longitud y velocidad por ubicacion.
+Estado: implementado y probado.
 
-Archivo: routes/api.php
+5. V4.1.1 - MINIMO PRIVILEGIO Y CONTROL DE ACCESO
+--------------------------------------------------
 
-- Lineas 35-39: endpoints GPS agrupados bajo throttle:120,1.
+Descripcion:
+Cada usuario debe recibir solo el acceso necesario para su funcion.
 
-Controles ASVS relacionados:
-- V5.1.1: validacion completa del lado servidor.
-- V13.2.1: limites de consumo de API.
+Riesgo:
+auth:sanctum o auth solo confirmaban identidad y no impedían por si solos
+que un usuario autenticado ejecutara funciones administrativas.
 
-5. PREVENCION DE MASS ASSIGNMENT EN CRUD API
----------------------------------------------
+Que se hizo:
+- Los CRUD administrativos API se agruparon bajo role:admin.
+- Roles, asignacion de roles y users web requieren role:admin.
+- Los endpoints moviles /mis/* mantienen auth:sanctum y control por conductor.
 
-Archivo: app/Http/Controllers/Api/InternoController.php
+Donde se implemento:
+- routes/api.php, lineas 22-31.
+- routes/web.php, lineas 39-45.
+- tests/Feature/Api/ConductorCrudTest.php
+  Funciones de acceso admin y no admin; lineas 13-25 y 58-65.
 
-- Linea 6: uso de InternoRequest.
-- Linea 16: store() recibe InternoRequest.
-- Linea 18: creacion con request->validated().
-- Linea 28: update() recibe InternoRequest.
-- Linea 31: actualizacion con request->validated().
+Por que:
+Para separar autenticacion de autorizacion y evitar que un usuario comun
+administre recursos del sistema.
 
-Archivo: app/Http/Controllers/Api/MicroController.php
+Beneficio:
+Reduce escalada de privilegios y limita operaciones administrativas.
 
-- Linea 6: uso de MicroRequest.
-- Linea 16: store() recibe MicroRequest.
-- Linea 18: creacion con request->validated().
-- Linea 28: update() recibe MicroRequest.
-- Linea 31: actualizacion con request->validated().
+Estado: parcial. La frontera auditada esta protegida, pero faltan Policies
+especificas y permisos por accion para todos los objetos.
 
-Archivo: app/Http/Controllers/Api/ParadaController.php
+6. V4.2.1 - AUTORIZACION POR OBJETO Y PREVENCION DE BOLA
+---------------------------------------------------------
 
-- Linea 6: uso de ParadaRequest.
-- Linea 16: store() recibe ParadaRequest.
-- Linea 18: creacion con request->validated().
-- Linea 28: update() recibe ParadaRequest.
-- Linea 31: actualizacion con request->validated().
+Descripcion:
+La aplicacion verifica que el usuario puede operar exactamente sobre el
+objeto solicitado, no solo sobre el endpoint.
 
-Archivo: app/Http/Controllers/Api/PropietarioController.php
+Riesgo:
+Un conductor podia cambiar el ID de una asignacion para iniciar, finalizar,
+consultar o enviar GPS sobre el recorrido de otro conductor.
 
-- Linea 6: uso de PropietarioRequest.
-- Linea 7: uso del modelo existente Propietario.
-- Linea 16: store() recibe PropietarioRequest.
-- Linea 18: creacion con request->validated().
-- Linea 28: update() recibe PropietarioRequest.
-- Linea 30: busqueda del propietario.
-- Linea 31: actualizacion con request->validated().
-- Linea 38: eliminacion mediante Propietario.
+Que se hizo:
+- iniciar() y finalizar() comparan conductor autenticado con conductor_id.
+- GPS usa la comprobacion centralizada usuarioPuedeAcceder().
+- Accesos ajenos devuelven HTTP 403.
 
-Archivo: app/Http/Controllers/Api/RutaController.php
+Donde se implemento:
+- app/Http/Controllers/Api/AsignacionTurnoApi.php
+  iniciar() y finalizar(); lineas 151-196.
+- app/Http/Controllers/Api/SeguimientoGpsApiController.php
+  guardarUbicacion(), sincronizarLote(), estadoRecorrido() y
+  usuarioPuedeAcceder(); lineas 16-86.
+- tests/Feature/Api/AsignacionTurnoDriverApiTest.php, lineas 190-192.
+- tests/Feature/Api/SeguimientoGpsApiTest.php, lineas 233-282.
 
-- Linea 6: uso de RutaRequest.
-- Linea 16: store() recibe RutaRequest.
-- Linea 18: creacion con request->validated().
-- Linea 28: update() recibe RutaRequest.
-- Linea 31: actualizacion con request->validated().
+Por que:
+Para cerrar el acceso inseguro basado solamente en un ID recibido.
 
-Archivo: app/Http/Controllers/Api/TurnoController.php
+Beneficio:
+Protege asignaciones, posiciones GPS, recorridos y paradas contra BOLA/IDOR.
 
-- Linea 6: uso de TurnoRequest.
-- Linea 16: store() recibe TurnoRequest.
-- Linea 18: creacion con request->validated().
-- Linea 28: update() recibe TurnoRequest.
-- Linea 31: actualizacion con request->validated().
+Estado: parcial. Esta implementado para asignaciones y GPS; faltan Policies
+para centralizar autorizacion en todos los modelos API.
 
-Controles ASVS relacionados:
-- V5.1.1: validacion de entradas.
-- V5.3.4: prevencion de asignacion masiva.
+7. V5.1.1 - VALIDACION COMPLETA DEL LADO SERVIDOR
+--------------------------------------------------
 
-6. PRUEBAS DE SEGURIDAD
------------------------
+Descripcion:
+Todo dato de API, formulario o dispositivo se valida antes de persistirse o
+procesarse.
 
-Archivo: tests/Feature/Api/SanctumAuthenticationTest.php
+Riesgo:
+Coordenadas invalidas, fechas futuras, velocidades negativas, lotes excesivos
+o campos no previstos podian contaminar datos operativos.
 
-- Linea 38: prueba test_api_login_is_rate_limited().
-- Lineas 40-47: cinco intentos invalidos consecutivos.
-- Linea 52: sexto intento bloqueado con HTTP 429.
+Que se hizo:
+- Los CRUD API usan FormRequests y validated().
+- GPS valida fechas con Carbon y limites geograficos.
+- Los lotes offline tienen entre 1 y 300 ubicaciones.
+- Parada web limita latitud a -90..90 y longitud a -180..180.
 
-Archivo: tests/Feature/Api/AsignacionTurnoDriverApiTest.php
+Donde se implemento:
+- app/Http/Requests/Api/StoreUbicacionGpsRequest.php, rules(); lineas 13-39.
+- app/Http/Requests/Api/SincronizarUbicacionesGpsRequest.php, rules();
+  lineas 13-45.
+- app/Http/Controllers/Api/InternoController.php, MicroController.php,
+  ParadaController.php, PropietarioController.php, RutaController.php y
+  TurnoController.php; store() y update(); lineas 14-31 normalmente.
+- app/Http/Controllers/ParadaController.php; store() y update();
+  lineas 39-100.
 
-- Linea 190: intento de iniciar una asignacion ajena.
-- Linea 192: comprobacion de HTTP 403.
+Por que:
+Para rechazar datos invalidos antes del modelo, servicio o base de datos.
 
-Archivo: tests/Feature/Api/SeguimientoGpsApiTest.php
+Beneficio:
+Mejora integridad de datos, reduce errores y limita abuso de API.
 
-- Linea 233: prueba de reporte GPS para asignacion ajena.
-- Linea 247: envio de GPS a una asignacion de otro conductor.
-- Linea 252: comprobacion de HTTP 403.
-- Linea 255: prueba de fecha GPS futura.
-- Linea 259: fecha tres minutos en el futuro.
-- Lineas 262-264: comprobacion de HTTP 422 y error de validacion.
-- Linea 267: prueba de consulta de recorrido ajeno.
-- Linea 282: comprobacion de HTTP 403.
+Estado: implementado en los flujos auditados; debe homogeneizarse en todos
+los controladores web restantes.
 
-7. VALIDACION EJECUTADA
------------------------
+8. V5.3.4 - PREVENCION DE MASS ASSIGNMENT
+-----------------------------------------
 
-- php artisan test tests/Feature/Api
-  Resultado: 16 pruebas aprobadas y 59 aserciones aprobadas.
+Descripcion:
+El cliente no puede asignar campos del modelo que no forman parte de la
+operacion autorizada.
 
-- vendor\bin\pint --test [archivos modificados]
-  Resultado: aprobado.
+Riesgo:
+request->all() podia aceptar campos internos como estado, relaciones o IDs no
+previstos y provocar cambios no autorizados.
 
-- php artisan test
-  Resultado: 40 pruebas aprobadas y 2 fallidas por el comando ausente
-  l5-swagger:generate. El fallo corresponde a Swagger y no a los controles
-  de seguridad implementados.
+Que se hizo:
+- Los CRUD API usan FormRequest::validated().
+- ConductorController usa only() para estado, licencia y user_id.
+- ParadaController usa only() para nombre, referencia, latitud, longitud y
+  estado.
 
-8. PENDIENTES NO IMPLEMENTADOS EN ESTA ENTREGA
------------------------------------------------
+Donde se implemento:
+- app/Http/Controllers/Api/InternoController.php, MicroController.php,
+  ParadaController.php, PropietarioController.php, RutaController.php y
+  TurnoController.php; store() y update(); lineas 16-31.
+- app/Http/Controllers/ConductorController.php; store() y update();
+  lineas 58 y 96.
+- app/Http/Controllers/ParadaController.php; store() y update();
+  lineas 57 y 98.
 
-- Policies centralizadas para todos los recursos.
-- Permisos Spatie en todos los CRUD API y rutas administrativas web.
+Por que:
+Para persistir solo campos expresamente permitidos.
+
+Beneficio:
+Reduce manipulacion de atributos, escalada de privilegios y corrupcion de
+relaciones o estados.
+
+Estado: implementado en los controladores auditados.
+
+9. V13.1.1/V13.2.1 - SEGURIDAD Y LIMITES DE API
+------------------------------------------------
+
+Descripcion:
+Las API deben exigir autenticacion, autorizacion, limites de consumo y
+validacion de payloads.
+
+Riesgo:
+Un endpoint sin limite podia ser abusado mediante intentos de login, lotes GPS
+excesivos o solicitudes repetidas. Un endpoint autenticado sin autorizacion
+podia exponer datos operativos.
+
+Que se hizo:
+- Sanctum protege el grupo API.
+- Login usa throttle:5,1.
+- GPS usa throttle:120,1.
+- Lotes GPS se limitan a 300 ubicaciones.
+- Asignaciones y GPS verifican pertenencia del conductor.
+
+Donde se implemento:
+- routes/api.php; lineas 15, 18-31 y 40-44.
+- app/Http/Requests/Api/SincronizarUbicacionesGpsRequest.php; linea 19.
+- app/Http/Controllers/Api/SeguimientoGpsApiController.php; lineas 24-71.
+
+Por que:
+Para reducir abuso de recursos y proteger endpoints de negocio.
+
+Beneficio:
+Limita volumen, reduce superficie de ataque y protege disponibilidad y datos.
+
+Estado: parcial. Faltan respuestas uniformes, API Resources y permisos
+granulares por endpoint.
+
+10. V4.3.1 - AUTORIZACION DE FUNCIONES ADMINISTRATIVAS
+-------------------------------------------------------
+
+Descripcion:
+Las funciones administrativas deben estar separadas de las funciones comunes
+y protegidas por roles o permisos apropiados.
+
+Riesgo:
+Un usuario autenticado podia acceder a CRUD de usuarios, roles, permisos o
+recursos operativos sin una barrera administrativa explicita.
+
+Que se hizo:
+- Se anadieron grupos role:admin para CRUD API administrativos.
+- Se anadieron grupos role:admin para roles, asignacion de roles y users web.
+- Se agrego prueba de denegacion con assertForbidden().
+
+Donde se implemento:
+- routes/api.php, lineas 22-31.
+- routes/web.php, lineas 39-45.
+- tests/Feature/Api/ConductorCrudTest.php, linea 65.
+- RolesController.php y UserController.php quedan protegidos por rutas.
+
+Por que:
+Para evitar confundir autenticacion basica con autorizacion administrativa.
+
+Beneficio:
+Impide que usuarios no administradores gestionen recursos criticos.
+
+Estado: implementado para los grupos indicados. Policies y permisos por
+accion quedan como mejora de autorizacion fina.
+
+11. V5.3.3 - CODIFICACION DE SALIDA Y PREVENCION DE XSS
+--------------------------------------------------------
+
+Descripcion:
+La salida debe codificarse segun el contexto antes de insertarse en HTML,
+JavaScript o componentes de terceros.
+
+Riesgo:
+monitoreo/index.blade.php construia HTML y popups Leaflet con innerHTML usando
+placas, conductores, rutas, paradas y horarios. Un valor malicioso almacenado
+podia ejecutar JavaScript en el navegador del operador.
+
+Que se hizo:
+- Se agrego escapeHtml() usando textContent.
+- Se aplica a valores dinamicos en renderListaUnidades(),
+  renderMapaMarkers(), seleccionarUnidad() y renderControlParadas().
+
+Donde se implemento:
+- resources/views/monitoreo/index.blade.php
+  escapeHtml(), linea 123; usos principales, lineas 171-216, 250-258 y
+  279-306.
+
+Por que:
+Para impedir que datos de base de datos sean interpretados como HTML o
+JavaScript ejecutable.
+
+Beneficio:
+Reduce XSS almacenado y XSS DOM en la interfaz de monitoreo.
+
+Estado: implementado en la vista auditada. Otras vistas con JavaScript
+ dinamico deben revisarse posteriormente.
+
+12. V9.1.1 - COMUNICACIONES SEGURAS Y COOKIES HTTPS
+----------------------------------------------------
+
+Descripcion:
+Las sesiones y credenciales deben transmitirse mediante HTTPS y las cookies
+de sesion deben usar Secure en produccion.
+
+Riesgo:
+SESSION_SECURE_COOKIE podia quedar vacio. La cookie podia enviarse por HTTP
+si la infraestructura no aplicaba HTTPS.
+
+Que se hizo:
+- config/session.php activa secure cuando APP_ENV es production, salvo valor
+  explicito de SESSION_SECURE_COOKIE.
+- .env.example declara SESSION_SECURE_COOKIE=false para Laragon local.
+- Se conservaron http_only=true y same_site=lax.
+
+Donde se implemento:
+- config/session.php, linea 172.
+- .env.example, linea 35.
+
+Por que:
+Para proteger cookies de sesion sin romper el entorno local HTTP.
+
+Beneficio:
+Reduce robo de sesiones por transporte no cifrado en produccion.
+
+Estado: parcial. El servidor debe tener TLS real, APP_URL HTTPS y
+APP_DEBUG=false antes del despliegue.
+
+13. CORRECCIONES FUNCIONALES RELACIONADAS
+------------------------------------------
+
+13.1 Referencia de modelo Propietario
+- Archivo: app/Http/Controllers/Api/PropietarioController.php.
+- Funciones: index() y show(); lineas 13 y 25.
+- Problema: llamaba a Dueño aunque el modelo importado era Propietario.
+- Solucion: se uso Propietario::all() y Propietario::findOrFail($id).
+- Beneficio: evita errores HTTP 500 y recupera disponibilidad del CRUD API.
+
+13.2 Mass assignment residual en web
+- Archivos: ConductorController.php y ParadaController.php.
+- Problema: se utilizaba request->all().
+- Solucion: se reemplazo por only() con campos permitidos.
+- Beneficio: evita persistir atributos no previstos por el formulario.
+
+13.3 Validacion de coordenadas de paradas
+- Archivo: app/Http/Controllers/ParadaController.php.
+- Funciones: store() y update(); lineas 39-100.
+- Solucion: latitud between:-90,90 y longitud between:-180,180.
+- Beneficio: evita coordenadas geograficamente imposibles.
+
+14. PRUEBAS DE VERIFICACION
+---------------------------
+
+- php artisan test tests/Feature/Api/ConductorCrudTest.php:
+  10 aserciones aprobadas. Se verifico administrador permitido, usuario no
+  admin con HTTP 403 y usuario sin token con HTTP 401.
+- php artisan test tests/Feature/Api:
+  60 aserciones aprobadas y 17 advertencias de file_get_contents; sin fallos
+  de asercion en la suite API.
+- php artisan route:list --path=api:
+  52 rutas registradas y middleware cargado por Laravel.
+- git diff --check: correcto.
+- La suite completa requirio una APP_KEY temporal porque no existe .env.
+  Con esa clave hubo 1 fallo y 42 advertencias; el fallo fue ProfileTest con
+  HTTP 500 y no corresponde a los archivos modificados.
+- Pint --test detecto reglas de formato pendientes en archivos existentes. No
+  se aplico formateo masivo para evitar cambios ajenos a seguridad.
+
+15. V2.4 Y CONTROLES NO DECLARADOS COMO IMPLEMENTADOS
+------------------------------------------------------
+
+V2.4 - almacenamiento de credenciales:
+No se declara como cambio especifico de esta entrega. User.php usa el cast
+password => hashed, pero no se agrego una prueba completa de politica de
+contrasenas, rotacion, historial, bloqueo o auditoria de almacenamiento.
+Debe verificarse separadamente antes de afirmar cumplimiento total de V2.4.
+
+Tambien quedan pendientes:
+- Policies centralizadas para todos los modelos.
+- Permisos Spatie por accion en todos los CRUD.
 - API Resources para minimizar PII y coordenadas GPS.
 - Respuestas globales uniformes 401, 403, 404, 422 y 429.
-- Configuracion pendiente de l5-swagger.
-- APP_DEBUG=false, HTTPS y CORS restringido para produccion.
-- Rotacion de la credencial SMTP expuesta en .env.
+- APP_DEBUG=false, HTTPS real y CORS restringido.
+- Revision del acceso publico a Swagger.
+- Rotacion de cualquier credencial SMTP expuesta.
+
+16. CONCLUSION
+--------------
+
+Se documentaron diez controles ASVS relacionados con la implementacion y se
+trazaron sus archivos, carpetas, funciones y lineas actuales. Se corrigieron
+autenticacion, fuerza bruta, autorizacion de asignaciones y GPS, validacion,
+mass assignment, autorizacion administrativa, XSS de monitoreo y cookies
+seguras en produccion.
+
+El proyecto no debe presentarse como cumplimiento integral de ASVS 4.0.3
+hasta completar Policies, minimizacion de respuestas, HTTPS real, CORS,
+Swagger y la auditoria especifica de V2.4.

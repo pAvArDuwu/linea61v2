@@ -36,11 +36,13 @@ Route::middleware('auth')->group(function () {
     Route::resource('asignacion-turno', AsignacionTurnoController::class);
     Route::resource('rutas-paradas', RutaParadaController::class);
 
-    Route::get('roles/asignar', [RolesController::class, 'assignUsers'])->name('roles.assign');
-    Route::post('roles/asignar', [RolesController::class, 'storeUserRoles'])->name('roles.assign.store');
-    Route::delete('roles/asignar/{id}', [RolesController::class, 'destroyUserRoles'])->name('roles.assign.destroy');
-    Route::resource('roles', RolesController::class);
-    Route::resource('users', App\Http\Controllers\UserController::class);
+    Route::middleware('role:admin')->group(function () {
+        Route::get('roles/asignar', [RolesController::class, 'assignUsers'])->name('roles.assign');
+        Route::post('roles/asignar', [RolesController::class, 'storeUserRoles'])->name('roles.assign.store');
+        Route::delete('roles/asignar/{id}', [RolesController::class, 'destroyUserRoles'])->name('roles.assign.destroy');
+        Route::resource('roles', RolesController::class);
+        Route::resource('users', App\Http\Controllers\UserController::class);
+    });
 
     // Módulo Transaccional (SDD Secciones 8, 9, 10, 16, 30)
     Route::get('seguimiento-rutas', [\App\Http\Controllers\MonitoreoController::class, 'index'])->name('seguimiento-rutas.index');
