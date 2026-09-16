@@ -18,6 +18,7 @@ class RoleSeeder extends Seeder
         $admin = Role::firstOrCreate(['name' => 'admin']);
         $conductor = Role::firstOrCreate(['name' => 'conductor']);
         $dueño = Role::firstOrCreate(['name' => 'dueño']);
+        $fiscalizador = Role::firstOrCreate(['name' => 'fiscalizador']);
 
         // Crear permisos para conductores
         Permission::firstOrCreate(['name' => 'conductor.index']);
@@ -62,6 +63,14 @@ class RoleSeeder extends Seeder
             'conductor.index', 'conductor.create', 'conductor.edit', 'conductor.show',
             'micro.index', 'micro.create', 'micro.edit', 'micro.show',
             'ruta.index', 'ruta.create', 'ruta.edit', 'ruta.show'
+        ]);
+
+        // Fiscalizador: permisos operativos y de control
+        $fiscalizador->syncPermissions([
+            'conductor.index', 'conductor.show',
+            'micro.index', 'micro.show',
+            'ruta.index', 'ruta.show',
+            'turno.index', 'turno.create', 'turno.edit', 'turno.show'
         ]);
     }
 }

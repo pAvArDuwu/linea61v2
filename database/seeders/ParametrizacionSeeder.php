@@ -3,7 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Conductor;
-use App\Models\Dueño;
+use App\Models\Propietario;
 use App\Models\Interno;
 use App\Models\Micro;
 use App\Models\parada;
@@ -26,7 +26,7 @@ class ParametrizacionSeeder extends Seeder
         ];
 
         foreach ($propietarios as $propietario) {
-            Dueño::updateOrCreate(['correo' => $propietario['correo']], $propietario);
+            Propietario::updateOrCreate(['correo' => $propietario['correo']], $propietario);
         }
 
         $conductores = [
@@ -65,7 +65,7 @@ class ParametrizacionSeeder extends Seeder
             parada::updateOrCreate(['nombre' => $parada['nombre']], $parada);
         }
 
-        $propietarioIds = Dueño::whereIn('correo', array_column($propietarios, 'correo'))->pluck('id', 'correo')->all();
+        $propietarioIds = Propietario::whereIn('correo', array_column($propietarios, 'correo'))->pluck('id', 'correo')->all();
         $internoIds = Interno::whereIn('numero_interno', array_column($internos, 'numero_interno'))->pluck('id', 'numero_interno')->all();
 
         $micros = [
