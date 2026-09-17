@@ -252,8 +252,8 @@ html_content = """<!DOCTYPE html>
         <tr>
             <td>4</td>
             <td><strong>V5: Validación y Sanitización</strong></td>
-            <td><span class="badge-code">V5.3.3</span></td>
-            <td>Codificación contextual contra Cross-Site Scripting (XSS)</td>
+            <td><span class="badge-code">V5.1.1</span></td>
+            <td>Validación de entradas en servidor</td>
             <td><span class="badge-status">Implementado</span></td>
         </tr>
         <tr>
@@ -409,29 +409,32 @@ Route::middleware('role:admin')->group(function () {
     <div class="control-header">
         <div>
             <div class="chapter-tag">Capítulo 5: V5 Validación y Sanitización</div>
-            <div class="control-title">Control V5.3.3: Codificación Contextual contra Inyecciones XSS</div>
+            <div class="control-title">Control V5.1.1: Validación de Entradas del Lado Servidor</div>
         </div>
         <span class="badge-status">Implementado</span>
     </div>
     
     <div class="control-sec-title">Descripción y Justificación de Seguridad:</div>
-    <div>ASVS V5.3.3 exige que toda salida de datos dinámica enviada al navegador sea codificada contextualmente para neutralizar scripts maliciosos (XSS almacenado y reflejado), evitando la ejecución de código en la sesión del operador.</div>
+    <div>ASVS V5.1.1 exige validar todos los datos recibidos en el servidor antes de procesarlos o guardarlos. En el módulo de paradas, Leaflet y Nominatim ayudan a seleccionar la ubicación y completar latitud/longitud, pero Laravel vuelve a validar esos datos antes de guardar. Así se rechazan paradas sin ubicación, coordenadas fuera del rango geográfico válido y estados no permitidos.</div>
 
     <div class="control-sec-title">Archivos y Líneas Modificadas:</div>
     <ul class="file-list">
-        <li><span class="file-path">resources/views/monitoreo/index.blade.php</span> (líneas 123-130 y 170-220): Función <code>escapeHtml()</code> para datos dinámicos en el mapa Leaflet.</li>
-        <li><span class="file-path">resources/views/parada/index.blade.php</span>: Directivas Blade <code>{{ $parada-&gt;nombre }}</code> con escape nativo.</li>
+        <li><span class="file-path">app/Http/Controllers/ParadaController.php</span> (store): Reglas para validar nombre, referencia, latitud, longitud y estado antes de crear.</li>
+        <li><span class="file-path">app/Http/Controllers/ParadaController.php</span> (update): Aplica las mismas reglas antes de modificar una parada existente.</li>
+        <li><span class="file-path">resources/views/parada/form.blade.php</span>: Usa Leaflet y Nominatim para seleccionar la ubicación y rellenar los campos ocultos de latitud/longitud.</li>
     </ul>
 
-    <div class="code-box">// resources/views/monitoreo/index.blade.php
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text ?? '';
-    return div.innerHTML; // Neutraliza caracteres &lt;, &gt;, ", '
-}</div>
+    <div class="code-box">// app/Http/Controllers/ParadaController.php
+$request-&gt;validate([
+    'nombre' =&gt; ['required', 'string', 'max:100'],
+    'referencia' =&gt; 'nullable|string|max:255',
+    'latitud' =&gt; 'required|numeric|between:-90,90',
+    'longitud' =&gt; 'required|numeric|between:-180,180',
+    'estado' =&gt; 'required|in:activo,inactivo',
+]);</div>
 
     <div class="test-box">
-        <strong>¿Cómo se prueba en la defensa en vivo?</strong> Crear una nueva parada con el nombre: <code>&lt;script&gt;alert('XSS')&lt;/script&gt;</code>. Al ver la lista o abrir el mapa en Monitoreo, la cadena se visualiza textualmente sin que el navegador ejecute ninguna ventana modal ni script malicioso.
+        <strong>¿Cómo se prueba en la defensa en vivo?</strong> Iniciar sesión como administrador, ir a <code>Paradas</code>, escribir un nombre y presionar guardar sin seleccionar ningún punto en el mapa. El sistema rechaza el formulario porque latitud y longitud son obligatorias. Luego seleccionar una ubicación en el mapa: JavaScript completa los campos con geocodificación inversa y el registro se guarda. Como prueba adicional, desde DevTools se puede cambiar latitud a <code>120</code> o longitud a <code>200</code>; Laravel lo rechaza por estar fuera del rango permitido.
     </div>
 </div>
 
@@ -539,7 +542,7 @@ class User extends Authenticatable implements MustVerifyEmail { ... }</div>
     </div>
     
     <div class="control-sec-title">Descripción y Justificación de Seguridad:</div>
-    <div>ASVS V9.1.2 exige que las cookies de sesión se configuren con la bandera <code>HttpOnly</code> para impedir que scripts del cliente (XSS) roben la cookie mediante <code>document.cookie</code>, y la directiva <code>SameSite=Lax</code> para proteger las peticiones contra falsificación de petición en sitios cruzados (CSRF).</div>
+    <div>ASVS V9.1.2 exige que las cookies de sesión se configuren con la bandera <code>HttpOnly</code> para impedir que scripts del cliente lean la cookie mediante <code>document.cookie</code>, y la directiva <code>SameSite=Lax</code> para proteger las peticiones contra falsificación de petición en sitios cruzados (CSRF).</div>
 
     <div class="control-sec-title">Archivos y Líneas Modificadas:</div>
     <ul class="file-list">

@@ -13,7 +13,7 @@ Arquitectura: Laravel 11 MVC, Sanctum, FormRequests, Spatie Roles, Blade y Leafl
 1. Capítulo 2 (V2: Autenticación)             -> Control V2.1.1 / V2.1.7: Contraseña mínima de 12 caracteres.
 2. Capítulo 3 (V3: Gestión de Sesiones)       -> Control V3.2.1: Regeneración de ID de sesión y logout seguro.
 3. Capítulo 4 (V4: Control de Acceso)         -> Control V4.1.1 / V4.3.1: Mínimo privilegio, RBAC y no autoasignación.
-4. Capítulo 5 (V5: Validación y Sanitización) -> Control V5.3.3: Codificación de salida contra inyecciones XSS.
+4. Capítulo 5 (V5: Validación y Sanitización) -> Control V5.1.1: Validación de entradas en servidor.
 5. Capítulo 6 (V6: Criptografía Almacenada)   -> Control V6.2.1: Hashing seguro de passwords con Bcrypt ($2y$12$).
 6. Capítulo 7 (V7: Manejo de Errores)         -> Control V7.1.1 / V7.1.2: Vistas de error genéricas sin fuga de rutas.
 7. Capítulo 8 (V8: Protección de Datos)       -> Control V8.2.1: Ocultamiento de contraseñas y tokens en JSON (Hidden).
@@ -136,35 +136,52 @@ Procedimiento de Prueba en Vivo (Defensa):
 --------------------------------------------------------------------------------
 CAPÍTULO 5: V5 VALIDACIÓN, SANITIZACIÓN Y CODIFICACIÓN
 --------------------------------------------------------------------------------
-Control Oficial: Control V5.3.3 - Codificación Contextual de Salida contra XSS
+Control Oficial: Control V5.1.1 - Validación de Entradas del Lado Servidor
 
 Vulnerabilidad y Riesgo:
-La inyección de caracteres especiales en nombres de paradas o recorridos podía ser
-interpretada como código HTML/JavaScript en la interfaz o mapa del operador (Stored XSS).
+Si el sistema confía únicamente en JavaScript, un usuario puede omitir la selección
+del mapa, alterar campos ocultos desde el navegador o enviar coordenadas inválidas.
+Esto permitiría guardar paradas sin ubicación real o con datos geográficos corruptos.
 Severidad: ALTA.
 
 Qué se implementó:
-Las vistas Blade emplean escape contextual nativo ({{ $campo }}) y en el mapa dinámico
-de monitoreo se implementó la función escapeHtml() utilizando textContent.
+El módulo de paradas usa Leaflet y geocodificación inversa con Nominatim para que el
+usuario seleccione una ubicación en el mapa. Ese JavaScript rellena automáticamente el
+nombre sugerido y los campos ocultos latitud/longitud. Como control de seguridad, Laravel
+vuelve a validar esos datos en el servidor antes de guardar: nombre obligatorio,
+coordenadas numéricas dentro del rango geográfico válido y estado limitado a valores
+permitidos.
 
 Archivos, Funciones y Líneas Modificadas:
-- resources/views/monitoreo/index.blade.php
-  Líneas 123-130: Función escapeHtml().
-  Líneas 171-216: Uso de escapeHtml() en popups de Leaflet y listado de paradas.
-- resources/views/parada/index.blade.php
-  Escapado seguro de nombres y referencias con Blade.
+- app/Http/Controllers/ParadaController.php
+  store(): valida nombre, referencia, latitud, longitud y estado antes de guardar.
+  update(): aplica las mismas reglas antes de modificar una parada existente.
+- resources/views/parada/form.blade.php
+  Usa Leaflet y Nominatim para seleccionar la ubicación y rellenar latitud/longitud.
 
 Código Implementado:
-  function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text ?? '';
-      return div.innerHTML;
-  }
+  $request->validate([
+      'nombre' => ['required', 'string', 'max:100'],
+      'referencia' => 'nullable|string|max:255',
+      'latitud' => 'required|numeric|between:-90,90',
+      'longitud' => 'required|numeric|between:-180,180',
+      'estado' => 'required|in:activo,inactivo',
+  ]);
 
 Procedimiento de Prueba en Vivo (Defensa):
-1. Crear una parada con el nombre: <script>alert('XSS')</script>.
-2. Guardar y abrir la vista de paradas o el mapa de Monitoreo.
-3. Comprobar que la cadena se visualiza como texto plano sin ejecutar el script.
+1. Iniciar sesión como administrador.
+2. Ir al módulo Paradas y presionar "Crear".
+3. Escribir un nombre, pero NO seleccionar ningún punto en el mapa.
+4. Enviar el formulario.
+5. El sistema no guarda porque latitud y longitud son obligatorias.
+6. Luego seleccionar una ubicación en el mapa: el JavaScript completa latitud/longitud
+   mediante Leaflet y geocodificación inversa.
+7. Enviar nuevamente y comprobar que la parada se guarda correctamente.
+
+Prueba adicional para explicar seguridad:
+- Aunque los campos latitud/longitud están ocultos, se pueden alterar desde DevTools.
+- Si se cambia latitud a 120 o longitud a 200, Laravel rechaza el registro porque
+  están fuera del rango permitido.
 
 
 --------------------------------------------------------------------------------
@@ -266,8 +283,8 @@ CAPÍTULO 9: V9 COMUNICACIONES (COMMUNICATIONS)
 Control Oficial: Control V9.1.2 - Banderas de Seguridad HttpOnly y SameSite en Cookies
 
 Vulnerabilidad y Riesgo:
-Cookies de sesión sin HttpOnly pueden ser leídas por código JavaScript malicioso en un
-ataque XSS, permitiendo el secuestro de la cuenta. Sin SameSite, se exponen a CSRF.
+Cookies de sesión sin HttpOnly pueden ser leídas por código JavaScript malicioso en
+el navegador, permitiendo el secuestro de la cuenta. Sin SameSite, se exponen a CSRF.
 Severidad: ALTA.
 
 Qué se implementó:
